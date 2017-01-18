@@ -1,0 +1,25 @@
+html,
+body,
+main {
+	width: 100%;
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	background-color: rgb(30, 30, 30);
+	font-size: percentage(12 / 16);
+	user-select: none;
+	$font: Menlo, Monaco, "Courier New", monospace;
+	$white: rgb(212, 212, 212);
+
+	* {
+		font-family: $font;
+		color: $white;
+
+		text {
+			font-family: $font;
+			fill: $white;
+		}
+	}
+}
