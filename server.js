@@ -53,4 +53,8 @@ app.post('/motion', (req, res) => {
 	res.sendStatus(200);
 });
 
+app.get('/drones', (req, res) => {
+	res.json(watcher.connectedDrones());
+});
+
 app.listen(port);

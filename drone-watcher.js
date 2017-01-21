@@ -23,4 +23,14 @@ module.exports = class DroneWatcher {
 		if (!Drone.isDronePeripheral(peripheral)) { return; }
 		console.log(uuid, name);
 	}
+
+	/**
+	 * @returns {{uuid: string, name: string}}
+	 */
+	connectedDrones() {
+		return [
+			{ uuid: 'uuid-00', name: 'name-00' },
+			{ uuid: 'uuid-01', name: 'name-01' }
+		];
+	}
 };

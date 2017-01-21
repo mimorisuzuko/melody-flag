@@ -35,12 +35,19 @@ class App extends Component {
 		this.state = {
 			trackList: List(),
 			player: new PlayerModel(),
-			droneList: List([
-				new DroneModel({ uuid: 'test-0', name: 'test-0' }),
-				new DroneModel({ uuid: 'test-1', name: 'test-1' }),
-				new DroneModel({ uuid: 'test-2', name: 'test-2' })
-			])
+			droneList: List()
 		};
+
+		this.draw();
+	}
+
+	draw() {
+		fetch('/drones').then((r) => r.json()).then((r) => {
+			const {state: {droneList}} = this;
+
+			this.setState({ droneList: droneList.merge(r) });
+			setTimeout(this.draw.bind(this), 500);
+		});
 	}
 
 	/**
