@@ -1,11 +1,11 @@
 {
-  "name": "browser-template",
+  "name": "melody-flag",
   "version": "0.0.1",
-  "description": "${yourDescription}",
-  "main": "${yourJavaScriptFile}.js",
+  "description": "ハッカソンのアレ",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "clean": "rm -rf docs/index.css docs/index.html docs/index.js docs/index.js.map",
+    "clean": "rm -rf docs/*",
     "watch": "gulp watch"
   },
   "keywords": [],
