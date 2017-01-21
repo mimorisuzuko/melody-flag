@@ -4,6 +4,7 @@ const rq = require('request-promise');
 const qs = require('querystring');
 const bodyParser = require('body-parser');
 const settings = require('./settings/index');
+const DroneWatcher = require('./drone-watcher');
 
 const port = 3000;
 const baseUrl = `http://localhost:${port}`;
@@ -11,6 +12,7 @@ const redirect_uri = `${baseUrl}/authorize`;
 const client_id = settings.get('key');
 const client_secret = settings.get('secret');
 const app = express();
+const watcher = new DroneWatcher();
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());

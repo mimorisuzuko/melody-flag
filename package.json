@@ -38,10 +38,12 @@
     "express": "^4.14.0",
     "immutable": "^3.8.1",
     "mdi": "^1.7.22",
+    "noble": "^1.7.0",
     "react": "^15.4.1",
     "react-dom": "^15.4.1",
     "react-icons": "^2.2.3",
     "request": "^2.79.0",
-    "request-promise": "^4.1.1"
+    "request-promise": "^4.1.1",
+    "rolling-spider": "^1.5.2"
   }
 }
