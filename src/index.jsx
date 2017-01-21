@@ -18,7 +18,7 @@ const lblackRGB = black.lighten(0.2).string();
 const llblackRGB = black.lighten(0.6).string();
 const blackRGB = black.string();
 
-class PlayerModel extends Record({ currentTime: 0, totalTime: 0, paused: true, id: '' }) { }
+class PlayerModel extends Record({ currentTime: 0, totalTime: 0, paused: true, id: '', changedId: false }) { }
 
 class DroneModel extends Record({ uuid: '', name: '' }) { }
 
@@ -78,8 +78,9 @@ class App extends Component {
 	onPlay(e) {
 		const {state: {player}} = this;
 		const {data: {paused, id}} = e;
+		const changedId = player.get('id') !== id;
 
-		this.setState({ player: player.merge({ paused, id }) });
+		this.setState({ player: player.merge({ paused: paused || changedId, id, changedId }) });
 	}
 
 	/**
@@ -88,8 +89,14 @@ class App extends Component {
 	onTimer(e) {
 		const {state: {player}} = this;
 		const {data: {currentTime, totalTime}} = e;
+		let changedId = player.get('changedId');
 
-		this.setState({ player: player.merge({ currentTime, totalTime }) });
+		if (changedId) {
+			changedId = false;
+			Rhapsody.player.pause();
+		}
+
+		this.setState({ player: player.merge({ currentTime, totalTime, changedId }) });
 	}
 
 	render() {
@@ -319,7 +326,7 @@ class Timeline extends Component {
 		} = this;
 		const {SIZE: dy} = Motion;
 		const {FPS: fps, INTERVAL: interval, HEIGHT: height} = Timeline;
-		const keyframesNumber = fps * 200;
+		const keyframesNumber = fps * player.get('totalTime');
 		const width = keyframesNumber * interval;
 		const keyframes = [];
 		const texts = [];
