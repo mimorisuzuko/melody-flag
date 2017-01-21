@@ -372,7 +372,7 @@ class Timeline extends Component {
 					{model.get('name')}
 				</div>
 				{motions}
-				<svg onDragOver={this.onDragOver.bind(this)} onDrop={this.onDrop.bind(this)} style={{
+				<svg onDragOver={this.onDragOver.bind(this)} onDrop={this.onDrop.bind(this)} onClick={this.onClick.bind(this)} style={{
 					display: 'block',
 					height,
 					width,
@@ -384,6 +384,19 @@ class Timeline extends Component {
 				</svg>
 			</div>
 		);
+	}
+
+	/**
+	 * @param {MouseEvent} e
+	 */
+	onClick(e) {
+		const {INTERVAL: interval, FPS: fps} = Timeline;
+		const {target, currentTarget, clientX} = e;
+		const {left} = currentTarget.getBoundingClientRect();
+		const x = clientX - left;
+		const t = x / interval / fps;
+
+		Rhapsody.player.seek(t);
 	}
 
 	/**
