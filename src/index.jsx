@@ -18,7 +18,7 @@ const lblackRGB = black.lighten(0.2).string();
 const llblackRGB = black.lighten(0.6).string();
 const blackRGB = black.string();
 
-class PlayerModel extends Record({ currentTime: 0, totalTime: 0, paused: true, id: '', changedId: false }) { }
+class PlayerModel extends Record({ currentTime: 0, totalTime: 0, paused: true, id: '' }) { }
 
 class DroneModel extends Record({ uuid: '', name: '' }) { }
 
@@ -62,10 +62,11 @@ class App extends Component {
 					id,
 					name,
 					album: {id: albumId},
-					artist: {name: artist}
+					artist: {name: artist},
+					duration
 				} = track;
 
-				return new TrackModel({ id, name, albumId, artist });
+				return new TrackModel({ id, name, albumId, artist, duration });
 			}));
 
 			this.setState({ trackList });
@@ -77,10 +78,9 @@ class App extends Component {
 	 */
 	onPlay(e) {
 		const {state: {player}} = this;
-		const {data: {paused, id}} = e;
-		const changedId = player.get('id') !== id;
+		const {data: {paused}} = e;
 
-		this.setState({ player: player.merge({ paused: paused || changedId, id, changedId }) });
+		this.setState({ player: player.merge({ paused }) });
 	}
 
 	/**
@@ -89,14 +89,8 @@ class App extends Component {
 	onTimer(e) {
 		const {state: {player}} = this;
 		const {data: {currentTime, totalTime}} = e;
-		let changedId = player.get('changedId');
 
-		if (changedId) {
-			changedId = false;
-			Rhapsody.player.pause();
-		}
-
-		this.setState({ player: player.merge({ currentTime, totalTime, changedId }) });
+		this.setState({ player: player.merge({ currentTime, totalTime }) });
 	}
 
 	render() {
@@ -109,10 +103,25 @@ class App extends Component {
 				display: 'flex',
 				flexDirection: 'column'
 			}}>
-				<Body trackList={trackList} player={player} droneList={droneList} />
+				<Body trackList={trackList} onClickTrack={this.onClickTrack.bind(this)} player={player} droneList={droneList} />
 				<Footer player={player} />
 			</div>
 		);
+	}
+
+	/**
+	 * @param {string} id
+	 * @param {number} totalTime
+	 */
+	onClickTrack(id, totalTime) {
+		const {state: {player}} = this;
+		const currentTime = 0;
+
+		if (player.get('id') !== id) {
+			Rhapsody.player.pause();
+		}
+
+		this.setState({ player: player.merge({ id, totalTime, currentTime }) });
 	}
 }
 
@@ -125,7 +134,7 @@ class Body extends Component {
 
 	render() {
 		const {
-			props: {trackList, player, droneList}
+			props: {trackList, player, droneList, onClickTrack}
 		} = this;
 
 		return (
@@ -134,7 +143,7 @@ class Body extends Component {
 				display: 'flex',
 				flexDirection: 'row',
 			}}>
-				<TrackList list={trackList} player={player} />
+				<TrackList list={trackList} player={player} onClickTrack={onClickTrack} />
 				<TimelineList player={player} droneList={droneList} />
 			</div>
 		);
@@ -159,7 +168,7 @@ class NavTitle extends Component {
 	}
 }
 
-class TrackModel extends Record({ albumId: '', id: '', name: '', artist: '' }) { }
+class TrackModel extends Record({ albumId: '', id: '', name: '', artist: '', duration: 0 }) { }
 
 class Track extends Component {
 	constructor(props) {
@@ -226,24 +235,19 @@ class Track extends Component {
 
 	onClick() {
 		const {
-			props: {model}
+			props: {model, onClick}
 		} = this;
 		const id = model.get('id');
+		const duration = model.get('duration');
 
-		if (Rhapsody.player.currentTrack === id) {
-			if (!Rhapsody.player.playing) {
-				Rhapsody.player.play(id);
-			}
-		} else {
-			Rhapsody.player.play(id);
-		}
+		onClick(id, duration);
 	}
 }
 
 class TrackList extends Component {
 	render() {
 		const {
-			props: {list, player}
+			props: {list, player, onClickTrack}
 		} = this;
 		const {WIDTH: width} = TrackList;
 
@@ -260,7 +264,7 @@ class TrackList extends Component {
 					overflowY: 'scroll',
 					height: '100%'
 				}}>
-					{list.map((model) => <Track model={model} selected={player.get('id')} />)}
+					{list.map((model) => <Track model={model} selected={player.get('id')} onClick={onClickTrack} />)}
 				</div>
 			</div>
 		);
