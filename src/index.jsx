@@ -293,9 +293,22 @@ class TimelineList extends Component {
 			prevFrame
 		} = this;
 		const {WIDTH: dwidth} = TrackList;
-		const {FPS: fps} = Timeline;
+		const {FPS: fps, INTERVAL: interval} = Timeline;
+		const keyframesNumber = fps * player.get('totalTime');
+		const width = keyframesNumber * interval;
 		const currentFrame = _.floor(player.get('currentTime') * fps);
+		const height = 18;
+		const texts = [];
+		const grid = [];
 
+		for (let i = 1; i < keyframesNumber; i += 1) {
+			const x = i * interval * fps;
+			const y = 12;
+			const mm = `0${_.floor(i / 60)}`.slice(-2);
+			const ss = `0${_.floor(i % 60)}`.slice(-2);
+			texts.push(<text x={x} y={y}>{`${mm}:${ss}:00`}</text>);
+			grid.push(<rect x={x} y={height - 5} height={5} width={1}></rect>);
+		}
 		this.prevFrame = player.get('paused') ? -1 : currentFrame;
 
 		return (
@@ -308,9 +321,31 @@ class TimelineList extends Component {
 				<div style={{
 					height: '100%',
 					width: '100%',
+					padding: '0 15px',
+					boxSizing: 'border-box',
 					overflow: 'scroll'
 				}}>
-					{droneList.map((model) => <Timeline currentFrame={currentFrame} prevFrame={prevFrame} model={model} player={player} />)}
+					<svg width={width} height={height} style={{
+						display: 'block',
+						padding: '1px 0'
+					}}>
+						<rect width='100%' height='100%' fill={lblackRGB}></rect>
+						<g fontSize={10} textAnchor='middle'>
+							{texts}
+						</g>
+						<g fill={llblackRGB}>
+							{grid}
+						</g>
+					</svg>
+					{droneList.map((model) => <Timeline
+						currentFrame={currentFrame}
+						prevFrame={prevFrame}
+						model={model}
+						player={player}
+						keyframesNumber={keyframesNumber}
+						width={width}
+						/>
+					)}
 				</div>
 			</div>
 		);
@@ -330,15 +365,12 @@ class Timeline extends Component {
 
 	render() {
 		const {
-			props: {model, player, prevFrame, currentFrame},
+			props: {model, player, prevFrame, currentFrame, width, keyframesNumber},
 			state: {motionList},
 		} = this;
 		const {SIZE: dy} = Motion;
 		const {FPS: fps, INTERVAL: interval, HEIGHT: height} = Timeline;
-		const keyframesNumber = fps * player.get('totalTime');
-		const width = keyframesNumber * interval;
 		const keyframes = [];
-		const texts = [];
 		const uuid = model.get('uuid');
 		const motions = motionList.map((model, i) => {
 			if (!model) { return null; }
@@ -359,25 +391,19 @@ class Timeline extends Component {
 				<Motion onDragEnd={this.onDragEndMotion.bind(this, i)} name={name} style={{
 					position: 'absolute',
 					top: height / 2 - dy / 2,
-					left: keyframe * interval
+					left: keyframe * interval - dy / 2
 				}} />
 			);
 		});
 
 		for (let i = 0; i < keyframesNumber; i += 1) {
 			const x = i * interval;
-			keyframes.push(<rect width={1} height='100%' x={x} fill={i % fps === 0 ? llblackRGB : lblackRGB} stroke='none'></rect>);
-
-			if (i % fps === 0) {
-				const s = _.floor(i / fps);
-				texts.push(<text x={x} y={height} fontSize='12'>{s}</text>);
-			}
+			keyframes.push(<rect width={1} height='100%' x={x} fill={i % fps === 0 ? llblackRGB : lblackRGB}></rect>);
 		}
 
 		return (
 			<div style={{
-				position: 'relative',
-				padding: '0 10px'
+				position: 'relative'
 			}}>
 				<div style={{
 					position: 'fixed',
@@ -394,8 +420,9 @@ class Timeline extends Component {
 					width,
 					borderBottom: `1px solid ${llblackRGB}`,
 				}}>
-					{keyframes}
-					{texts}
+					<g stroke='none'>
+						{keyframes}
+					</g>
 					<rect width={1} height='100%' x={currentFrame * interval} fill={blueRGB} stroke='none'></rect>
 				</svg>
 			</div>
