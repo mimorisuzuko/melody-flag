@@ -57,7 +57,8 @@ class App extends Component {
 	onReady(accessToken, refreshToken) {
 		Rhapsody.member.set({ accessToken, refreshToken });
 		Rhapsody.api.get(false, '/tracks/top', (tracks) => {
-			const trackList = Immutable.fromJS(_.map(tracks, (track) => {
+			const {state: {player}} = this;
+			const trackList = Immutable.fromJS(_.map(tracks, (track, i) => {
 				const {
 					id,
 					name,
@@ -65,6 +66,10 @@ class App extends Component {
 					artist: {name: artist},
 					duration
 				} = track;
+
+				if (i === 0) {
+					this.setState({ player: player.merge({ id, totalTime: duration }) });
+				}
 
 				return new TrackModel({ id, name, albumId, artist, duration });
 			}));
