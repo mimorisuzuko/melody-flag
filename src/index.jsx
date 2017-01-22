@@ -294,14 +294,15 @@ class TimelineList extends Component {
 		} = this;
 		const {WIDTH: dwidth} = TrackList;
 		const {FPS: fps, INTERVAL: interval} = Timeline;
-		const keyframesNumber = fps * player.get('totalTime');
+		const totalTime = player.get('totalTime');
+		const keyframesNumber = fps * totalTime;
 		const width = keyframesNumber * interval;
 		const currentFrame = Math.floor(player.get('currentTime') * fps);
 		const height = 18;
 		const texts = [];
 		const grid = [];
 
-		for (let i = 1; i < keyframesNumber; i += 1) {
+		for (let i = 1; i < totalTime; i += 1) {
 			const x = i * interval * fps;
 			const y = 12;
 			const mm = `0${Math.floor(i / 60)}`.slice(-2);
@@ -320,8 +321,8 @@ class TimelineList extends Component {
 				<NavTitle text='Timeline' />
 				<div style={{
 					height: '100%',
-					width: '100%',
-					padding: '0 15px',
+					width: 'calc(100% - 30px)',
+					margin: '0 15px',
 					boxSizing: 'border-box',
 					overflow: 'scroll'
 				}}>
@@ -372,7 +373,7 @@ class Timeline extends Component {
 		const {FPS: fps, INTERVAL: interval, HEIGHT: height} = Timeline;
 		const keyframes = [];
 		const uuid = model.get('uuid');
-		const motions = motionList.map((model, i) => {
+		const motions = motionList.map((model) => {
 			if (!model) { return null; }
 			const keyframe = model.get('keyframe');
 			const name = model.get('name');
@@ -388,7 +389,7 @@ class Timeline extends Component {
 			}
 
 			return (
-				<Motion onDragEnd={this.onDragEndMotion.bind(this, i)} name={name} style={{
+				<Motion name={name} style={{
 					position: 'absolute',
 					top: height / 2 - dy / 2,
 					left: keyframe * interval - dy / 2
@@ -402,8 +403,9 @@ class Timeline extends Component {
 		}
 
 		return (
-			<div style={{
-				position: 'relative'
+			<div onDragOver={this.onDragOver.bind(this)} onDrop={this.onDrop.bind(this)} style={{
+				position: 'relative',
+				width
 			}}>
 				<div style={{
 					position: 'fixed',
@@ -414,12 +416,11 @@ class Timeline extends Component {
 					{model.get('name')}
 				</div>
 				{motions}
-				<svg onDragOver={this.onDragOver.bind(this)} onDrop={this.onDrop.bind(this)} onClick={this.onClick.bind(this)} style={{
-					display: 'block',
-					height,
-					width,
-					borderBottom: `1px solid ${llblackRGB}`,
-				}}>
+				<svg width={width} height={height} onClick={this.onClick.bind(this)}
+					style={{
+						display: 'block',
+						borderBottom: `1px solid ${llblackRGB}`,
+					}}>
 					<g stroke='none'>
 						{keyframes}
 					</g>
@@ -457,25 +458,14 @@ class Timeline extends Component {
 	 */
 	onDrop(e) {
 		const {state: {motionList}} = this;
-		const {clientX, currentTarget, dataTransfer} = e;
-		const {left, width} = currentTarget.getBoundingClientRect();
+		const {clientX, dataTransfer} = e;
+		const {left, width} = ReactDOM.findDOMNode(this).getBoundingClientRect();
 		const {INTERVAL: interval} = Timeline;
 		const x = clientX - left;
 		const keyframe = Math.round(x / interval);
 		const {name} = JSON.parse(dataTransfer.getData('text/plain'));
 
-		if (motionList.get(keyframe)) { return; }
-
 		this.setState({ motionList: motionList.set(keyframe, new MotionModel({ name, keyframe })) });
-	}
-
-	/**
-	 * @param {number} index
-	 */
-	onDragEndMotion(index) {
-		const {state: {motionList}} = this;
-
-		this.setState({ motionList: motionList.delete(index) });
 	}
 
 	static get HEIGHT() {
@@ -499,7 +489,7 @@ class Motion extends Component {
 		const {SIZE: size} = Motion;
 
 		return (
-			<div draggable onDragStart={this.onDragStart.bind(this)} onDragEnd={this.onDragEnd.bind(this)} style={_.assign({
+			<div draggable onDragStart={this.onDragStart.bind(this)} style={_.assign({
 				width: size,
 				height: size,
 				borderRadius: '50%',
@@ -518,25 +508,10 @@ class Motion extends Component {
 	 * @param {DragEvent} e
 	 */
 	onDragStart(e) {
-		const {props: {name, onDragStart}} = this;
+		const {props: {name}} = this;
 		const {dataTransfer} = e;
 
 		dataTransfer.setData('text/plain', JSON.stringify({ name }));
-	}
-
-	/**
-	 * @param {DragEvent} e
-	 */
-	onDragEnd(e) {
-		const {props: {onDragEnd}} = this;
-
-		onDragEnd();
-	}
-
-	static get defaultProps() {
-		return {
-			onDragEnd: () => { }
-		};
 	}
 
 	static get SIZE() {
@@ -582,8 +557,8 @@ class Footer extends Component {
 				flexDirection: 'row',
 				padding: '10px 10px',
 				position: 'fixed',
-				right: 10,
-				bottom: 10,
+				right: 15,
+				bottom: 15,
 				backgroundColor: blueRGB,
 				borderRadius: 4,
 				boxShadow: '0 3px 3px 0 rgba(0, 0, 0, 0.14), 0 1px 7px 0 rgba(0, 0, 0, 0.12), 0 3px 1px -1px rgba(0, 0, 0, 0.2)'
