@@ -296,7 +296,7 @@ class TimelineList extends Component {
 		const {FPS: fps, INTERVAL: interval} = Timeline;
 		const keyframesNumber = fps * player.get('totalTime');
 		const width = keyframesNumber * interval;
-		const currentFrame = _.floor(player.get('currentTime') * fps);
+		const currentFrame = Math.floor(player.get('currentTime') * fps);
 		const height = 18;
 		const texts = [];
 		const grid = [];
@@ -304,8 +304,8 @@ class TimelineList extends Component {
 		for (let i = 1; i < keyframesNumber; i += 1) {
 			const x = i * interval * fps;
 			const y = 12;
-			const mm = `0${_.floor(i / 60)}`.slice(-2);
-			const ss = `0${_.floor(i % 60)}`.slice(-2);
+			const mm = `0${Math.floor(i / 60)}`.slice(-2);
+			const ss = `0${Math.floor(i % 60)}`.slice(-2);
 			texts.push(<text x={x} y={y}>{`${mm}:${ss}:00`}</text>);
 			grid.push(<rect x={x} y={height - 5} height={5} width={1}></rect>);
 		}
