@@ -461,7 +461,7 @@ class Timeline extends Component {
 		const {left, width} = currentTarget.getBoundingClientRect();
 		const {INTERVAL: interval} = Timeline;
 		const x = clientX - left;
-		const keyframe = _.round(x / interval);
+		const keyframe = Math.round(x / interval);
 		const {name} = JSON.parse(dataTransfer.getData('text/plain'));
 
 		if (motionList.get(keyframe)) { return; }
