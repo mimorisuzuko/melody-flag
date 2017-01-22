@@ -494,20 +494,8 @@ class Timeline extends Component {
 class Motion extends Component {
 	render() {
 		const {props: {name, style}} = this;
-		const Icon = {
-			takeoff: MdFlightTakeoff,
-			land: MdFlightLand,
-			up: FaAngleDoubleUp,
-			down: FaAngleDoubleDown,
-			turnRight: FaRepeat,
-			turnLeft: FaRotateLeft,
-			forward: FaArrowUp,
-			backward: FaArrowDown,
-			left: FaArrowLeft,
-			right: FaArrowRight,
-			frontFlip: MdFlipToBack,
-			leftFlip: MdFlipToFront
-		}[name];
+		const {LIST: list} = Motion;
+		const {Element} = _.find(list, { name });
 		const {SIZE: size} = Motion;
 
 		return (
@@ -521,7 +509,7 @@ class Motion extends Component {
 				cursor: 'pointer',
 				opacity: 0.9999
 			}, style)}>
-				<Icon size={16} />
+				<Element size={16} />
 			</div>
 		);
 	}
@@ -554,21 +542,37 @@ class Motion extends Component {
 	static get SIZE() {
 		return 24;
 	}
+
+	static get LIST() {
+		return [
+			{ name: 'takeoff', Element: MdFlightTakeoff },
+			{ name: 'land', Element: MdFlightLand },
+			{ name: 'up', Element: FaAngleDoubleUp },
+			{ name: 'down', Element: FaAngleDoubleDown },
+			{ name: 'turnRight', Element: FaRepeat },
+			{ name: 'turnLeft', Element: FaRotateLeft },
+			{ name: 'forward', Element: FaArrowUp },
+			{ name: 'backward', Element: FaArrowDown },
+			{ name: 'left', Element: FaArrowLeft },
+			{ name: 'right', Element: FaArrowRight },
+			{ name: 'frontFlip', Element: MdFlipToBack },
+			{ name: 'leftFlip', Element: MdFlipToFront }
+		];
+	}
 }
 
 class Footer extends Component {
 	render() {
 		const {props: {player}} = this;
 		const Icon = player.get('paused') ? FaPlayCircle : FaPauseCircle;
-		const [headMotionList, tailMotionList] = _.map([
-			['takeoff', 'land', 'up', 'down', 'turnRight', 'turnLeft'],
-			['forward', 'backward', 'left', 'right', 'frontFlip', 'leftFlip']
-		], (a) => (
+		const {LIST: list} = Motion;
+		const {length} = list;
+		const motionList = _.map(_.chunk(list, length / 2), (a) => (
 			<div style={{
 				display: 'flex',
 				flexDirection: 'row'
 			}}>
-				{_.map(a, (b) => <Motion name={b} />)}
+				{_.map(a, ({name}) => <Motion name={name} />)}
 			</div>
 		));
 
@@ -594,8 +598,7 @@ class Footer extends Component {
 				<div style={{
 					paddingLeft: 10
 				}}>
-					{headMotionList}
-					{tailMotionList}
+					{motionList}
 				</div>
 			</div>
 		);
