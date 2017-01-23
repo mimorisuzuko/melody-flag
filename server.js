@@ -4,6 +4,7 @@ const rq = require('request-promise');
 const qs = require('querystring');
 const bodyParser = require('body-parser');
 const settings = require('./settings/index');
+const DroneWatcher = require('./drone-watcher');
 
 const port = 3000;
 const baseUrl = `http://localhost:${port}`;
@@ -11,6 +12,7 @@ const redirect_uri = `${baseUrl}/authorize`;
 const client_id = settings.get('key');
 const client_secret = settings.get('secret');
 const app = express();
+const watcher = new DroneWatcher();
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -46,9 +48,23 @@ app.get('/authorize', (req, res) => {
 });
 
 app.post('/motion', (req, res) => {
-	const {body} = req;
-	console.log(body);
+	const {body: {name, uuid}} = req;
+	const drone = watcher.drone(uuid);
+	console.log(`${name}	${uuid}`);
+
+	if (drone) {
+		if (name === 'takeOff') {
+			drone.takeOff();
+		} else if (name === 'land') {
+			drone.land();
+		}
+	}
+
 	res.sendStatus(200);
+});
+
+app.get('/drones', (req, res) => {
+	res.json(watcher.connectedDrones());
 });
 
 app.listen(port);

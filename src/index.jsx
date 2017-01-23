@@ -35,12 +35,19 @@ class App extends Component {
 		this.state = {
 			trackList: List(),
 			player: new PlayerModel(),
-			droneList: List([
-				new DroneModel({ uuid: 'test-0', name: 'test-0' }),
-				new DroneModel({ uuid: 'test-1', name: 'test-1' }),
-				new DroneModel({ uuid: 'test-2', name: 'test-2' })
-			])
+			droneList: List()
 		};
+
+		this.draw();
+	}
+
+	draw() {
+		fetch('/drones').then((r) => r.json()).then((r) => {
+			const {state: {droneList}} = this;
+
+			this.setState({ droneList: droneList.merge(r) });
+			setTimeout(this.draw.bind(this), 500);
+		});
 	}
 
 	/**
@@ -50,15 +57,21 @@ class App extends Component {
 	onReady(accessToken, refreshToken) {
 		Rhapsody.member.set({ accessToken, refreshToken });
 		Rhapsody.api.get(false, '/tracks/top', (tracks) => {
-			const trackList = Immutable.fromJS(_.map(tracks, (track) => {
+			const {state: {player}} = this;
+			const trackList = Immutable.fromJS(_.map(tracks, (track, i) => {
 				const {
 					id,
 					name,
 					album: {id: albumId},
-					artist: {name: artist}
+					artist: {name: artist},
+					duration
 				} = track;
 
-				return new TrackModel({ id, name, albumId, artist });
+				if (i === 0) {
+					this.setState({ player: player.merge({ id, totalTime: duration }) });
+				}
+
+				return new TrackModel({ id, name, albumId, artist, duration });
 			}));
 
 			this.setState({ trackList });
@@ -70,9 +83,9 @@ class App extends Component {
 	 */
 	onPlay(e) {
 		const {state: {player}} = this;
-		const {data: {paused, id}} = e;
+		const {data: {paused}} = e;
 
-		this.setState({ player: player.merge({ paused, id }) });
+		this.setState({ player: player.merge({ paused }) });
 	}
 
 	/**
@@ -95,10 +108,25 @@ class App extends Component {
 				display: 'flex',
 				flexDirection: 'column'
 			}}>
-				<Body trackList={trackList} player={player} droneList={droneList} />
+				<Body trackList={trackList} onClickTrack={this.onClickTrack.bind(this)} player={player} droneList={droneList} />
 				<Footer player={player} />
 			</div>
 		);
+	}
+
+	/**
+	 * @param {string} id
+	 * @param {number} totalTime
+	 */
+	onClickTrack(id, totalTime) {
+		const {state: {player}} = this;
+		const currentTime = 0;
+
+		if (player.get('id') !== id) {
+			Rhapsody.player.pause();
+		}
+
+		this.setState({ player: player.merge({ id, totalTime, currentTime }) });
 	}
 }
 
@@ -111,7 +139,7 @@ class Body extends Component {
 
 	render() {
 		const {
-			props: {trackList, player, droneList}
+			props: {trackList, player, droneList, onClickTrack}
 		} = this;
 
 		return (
@@ -120,7 +148,7 @@ class Body extends Component {
 				display: 'flex',
 				flexDirection: 'row',
 			}}>
-				<TrackList list={trackList} player={player} />
+				<TrackList list={trackList} player={player} onClickTrack={onClickTrack} />
 				<TimelineList player={player} droneList={droneList} />
 			</div>
 		);
@@ -145,7 +173,7 @@ class NavTitle extends Component {
 	}
 }
 
-class TrackModel extends Record({ albumId: '', id: '', name: '', artist: '' }) { }
+class TrackModel extends Record({ albumId: '', id: '', name: '', artist: '', duration: 0 }) { }
 
 class Track extends Component {
 	constructor(props) {
@@ -212,24 +240,19 @@ class Track extends Component {
 
 	onClick() {
 		const {
-			props: {model}
+			props: {model, onClick}
 		} = this;
 		const id = model.get('id');
+		const duration = model.get('duration');
 
-		if (Rhapsody.player.currentTrack === id) {
-			if (!Rhapsody.player.playing) {
-				Rhapsody.player.play(id);
-			}
-		} else {
-			Rhapsody.player.play(id);
-		}
+		onClick(id, duration);
 	}
 }
 
 class TrackList extends Component {
 	render() {
 		const {
-			props: {list, player}
+			props: {list, player, onClickTrack}
 		} = this;
 		const {WIDTH: width} = TrackList;
 
@@ -246,7 +269,7 @@ class TrackList extends Component {
 					overflowY: 'scroll',
 					height: '100%'
 				}}>
-					{list.map((model) => <Track model={model} selected={player.get('id')} />)}
+					{list.map((model) => <Track model={model} selected={player.get('id')} onClick={onClickTrack} />)}
 				</div>
 			</div>
 		);
@@ -270,9 +293,23 @@ class TimelineList extends Component {
 			prevFrame
 		} = this;
 		const {WIDTH: dwidth} = TrackList;
-		const {FPS: fps} = Timeline;
-		const currentFrame = _.floor(player.get('currentTime') * fps);
+		const {FPS: fps, INTERVAL: interval} = Timeline;
+		const totalTime = player.get('totalTime');
+		const keyframesNumber = fps * totalTime;
+		const width = keyframesNumber * interval;
+		const currentFrame = Math.floor(player.get('currentTime') * fps);
+		const height = 18;
+		const texts = [];
+		const grid = [];
 
+		for (let i = 1; i < totalTime; i += 1) {
+			const x = i * interval * fps;
+			const y = 12;
+			const mm = `0${Math.floor(i / 60)}`.slice(-2);
+			const ss = `0${Math.floor(i % 60)}`.slice(-2);
+			texts.push(<text x={x} y={y}>{`${mm}:${ss}:00`}</text>);
+			grid.push(<rect x={x} y={height - 5} height={5} width={1}></rect>);
+		}
 		this.prevFrame = player.get('paused') ? -1 : currentFrame;
 
 		return (
@@ -284,10 +321,32 @@ class TimelineList extends Component {
 				<NavTitle text='Timeline' />
 				<div style={{
 					height: '100%',
-					width: '100%',
+					width: 'calc(100% - 30px)',
+					margin: '0 15px',
+					boxSizing: 'border-box',
 					overflow: 'scroll'
 				}}>
-					{droneList.map((model) => <Timeline currentFrame={currentFrame} prevFrame={prevFrame} model={model} player={player} />)}
+					<svg width={width} height={height} style={{
+						display: 'block',
+						padding: '1px 0'
+					}}>
+						<rect width='100%' height='100%' fill={lblackRGB}></rect>
+						<g fontSize={10} textAnchor='middle'>
+							{texts}
+						</g>
+						<g fill={llblackRGB}>
+							{grid}
+						</g>
+					</svg>
+					{droneList.map((model) => <Timeline
+						currentFrame={currentFrame}
+						prevFrame={prevFrame}
+						model={model}
+						player={player}
+						keyframesNumber={keyframesNumber}
+						width={width}
+						/>
+					)}
 				</div>
 			</div>
 		);
@@ -300,6 +359,7 @@ class Timeline extends Component {
 	constructor(props) {
 		super(props);
 
+		this.tempIndex = -1;
 		this.state = {
 			motionList: List()
 		};
@@ -307,15 +367,12 @@ class Timeline extends Component {
 
 	render() {
 		const {
-			props: {model, player, prevFrame, currentFrame},
+			props: {model, player, prevFrame, currentFrame, width, keyframesNumber},
 			state: {motionList},
 		} = this;
 		const {SIZE: dy} = Motion;
 		const {FPS: fps, INTERVAL: interval, HEIGHT: height} = Timeline;
-		const keyframesNumber = fps * 200;
-		const width = keyframesNumber * interval;
 		const keyframes = [];
-		const texts = [];
 		const uuid = model.get('uuid');
 		const motions = motionList.map((model, i) => {
 			if (!model) { return null; }
@@ -333,28 +390,23 @@ class Timeline extends Component {
 			}
 
 			return (
-				<Motion onDragEnd={this.onDragEndMotion.bind(this, i)} name={name} style={{
+				<Motion onDragStart={this.onDragStartMotion.bind(this)} onDragEnd={this.onDragEndMotion.bind(this, i)} name={name} style={{
 					position: 'absolute',
 					top: height / 2 - dy / 2,
-					left: keyframe * interval
+					left: keyframe * interval - dy / 2
 				}} />
 			);
 		});
 
 		for (let i = 0; i < keyframesNumber; i += 1) {
 			const x = i * interval;
-			keyframes.push(<rect width={1} height='100%' x={x} fill={i % fps === 0 ? llblackRGB : lblackRGB} stroke='none'></rect>);
-
-			if (i % fps === 0) {
-				const s = _.floor(i / fps);
-				texts.push(<text x={x} y={height} fontSize='12'>{s}</text>);
-			}
+			keyframes.push(<rect width={1} height='100%' x={x} fill={i % fps === 0 ? llblackRGB : lblackRGB}></rect>);
 		}
 
 		return (
-			<div style={{
+			<div onDragOver={this.onDragOver.bind(this)} onDrop={this.onDrop.bind(this)} style={{
 				position: 'relative',
-				padding: '0 10px'
+				width
 			}}>
 				<div style={{
 					position: 'fixed',
@@ -365,18 +417,31 @@ class Timeline extends Component {
 					{model.get('name')}
 				</div>
 				{motions}
-				<svg onDragOver={this.onDragOver.bind(this)} onDrop={this.onDrop.bind(this)} style={{
-					display: 'block',
-					height,
-					width,
-					borderBottom: `1px solid ${llblackRGB}`,
-				}}>
-					{keyframes}
-					{texts}
+				<svg width={width} height={height} onClick={this.onClick.bind(this)}
+					style={{
+						display: 'block',
+						borderBottom: `1px solid ${llblackRGB}`,
+					}}>
+					<g stroke='none'>
+						{keyframes}
+					</g>
 					<rect width={1} height='100%' x={currentFrame * interval} fill={blueRGB} stroke='none'></rect>
 				</svg>
 			</div>
 		);
+	}
+
+	/**
+	 * @param {MouseEvent} e
+	 */
+	onClick(e) {
+		const {INTERVAL: interval, FPS: fps} = Timeline;
+		const {target, currentTarget, clientX} = e;
+		const {left} = currentTarget.getBoundingClientRect();
+		const x = clientX - left;
+		const t = x / interval / fps;
+
+		Rhapsody.player.seek(t);
 	}
 
 	/**
@@ -394,24 +459,28 @@ class Timeline extends Component {
 	 */
 	onDrop(e) {
 		const {state: {motionList}} = this;
-		const {clientX, currentTarget, dataTransfer} = e;
-		const {left, width} = currentTarget.getBoundingClientRect();
+		const {clientX, dataTransfer} = e;
+		const {left, width} = ReactDOM.findDOMNode(this).getBoundingClientRect();
 		const {INTERVAL: interval} = Timeline;
 		const x = clientX - left;
-		const keyframe = _.round(x / interval);
+		const keyframe = Math.round(x / interval);
 		const {name} = JSON.parse(dataTransfer.getData('text/plain'));
 
-		if (motionList.get(keyframe)) { return; }
-
+		this.tempIndex = keyframe;
 		this.setState({ motionList: motionList.set(keyframe, new MotionModel({ name, keyframe })) });
+	}
+
+	onDragStartMotion() {
+		this.tempIndex = -1;
 	}
 
 	/**
 	 * @param {number} index
 	 */
 	onDragEndMotion(index) {
-		const {state: {motionList}} = this;
+		const {tempIndex, state: {motionList}} = this;
 
+		if (tempIndex === index) { return; }
 		this.setState({ motionList: motionList.delete(index) });
 	}
 
@@ -431,20 +500,8 @@ class Timeline extends Component {
 class Motion extends Component {
 	render() {
 		const {props: {name, style}} = this;
-		const Icon = {
-			takeoff: MdFlightTakeoff,
-			land: MdFlightLand,
-			up: FaAngleDoubleUp,
-			down: FaAngleDoubleDown,
-			turnRight: FaRepeat,
-			turnLeft: FaRotateLeft,
-			forward: FaArrowUp,
-			backward: FaArrowDown,
-			left: FaArrowLeft,
-			right: FaArrowRight,
-			frontFlip: MdFlipToBack,
-			leftFlip: MdFlipToFront
-		}[name];
+		const {LIST: list} = Motion;
+		const {Element} = _.find(list, { name });
 		const {SIZE: size} = Motion;
 
 		return (
@@ -458,7 +515,7 @@ class Motion extends Component {
 				cursor: 'pointer',
 				opacity: 0.9999
 			}, style)}>
-				<Icon size={16} />
+				<Element size={16} />
 			</div>
 		);
 	}
@@ -471,12 +528,10 @@ class Motion extends Component {
 		const {dataTransfer} = e;
 
 		dataTransfer.setData('text/plain', JSON.stringify({ name }));
+		onDragStart();
 	}
 
-	/**
-	 * @param {DragEvent} e
-	 */
-	onDragEnd(e) {
+	onDragEnd() {
 		const {props: {onDragEnd}} = this;
 
 		onDragEnd();
@@ -484,6 +539,7 @@ class Motion extends Component {
 
 	static get defaultProps() {
 		return {
+			onDragStart: () => { },
 			onDragEnd: () => { }
 		};
 	}
@@ -491,21 +547,37 @@ class Motion extends Component {
 	static get SIZE() {
 		return 24;
 	}
+
+	static get LIST() {
+		return [
+			{ name: 'takeOff', Element: MdFlightTakeoff },
+			{ name: 'land', Element: MdFlightLand },
+			{ name: 'up', Element: FaAngleDoubleUp },
+			{ name: 'down', Element: FaAngleDoubleDown },
+			{ name: 'turnRight', Element: FaRepeat },
+			{ name: 'turnLeft', Element: FaRotateLeft },
+			{ name: 'forward', Element: FaArrowUp },
+			{ name: 'backward', Element: FaArrowDown },
+			{ name: 'left', Element: FaArrowLeft },
+			{ name: 'right', Element: FaArrowRight },
+			{ name: 'frontFlip', Element: MdFlipToBack },
+			{ name: 'leftFlip', Element: MdFlipToFront }
+		];
+	}
 }
 
 class Footer extends Component {
 	render() {
 		const {props: {player}} = this;
 		const Icon = player.get('paused') ? FaPlayCircle : FaPauseCircle;
-		const [headMotionList, tailMotionList] = _.map([
-			['takeoff', 'land', 'up', 'down', 'turnRight', 'turnLeft'],
-			['forward', 'backward', 'left', 'right', 'frontFlip', 'leftFlip']
-		], (a) => (
+		const {LIST: list} = Motion;
+		const {length} = list;
+		const motionList = _.map(_.chunk(list, length / 2), (a) => (
 			<div style={{
 				display: 'flex',
 				flexDirection: 'row'
 			}}>
-				{_.map(a, (b) => <Motion name={b} />)}
+				{_.map(a, ({name}) => <Motion name={name} />)}
 			</div>
 		));
 
@@ -515,8 +587,8 @@ class Footer extends Component {
 				flexDirection: 'row',
 				padding: '10px 10px',
 				position: 'fixed',
-				right: 10,
-				bottom: 10,
+				right: 15,
+				bottom: 15,
 				backgroundColor: blueRGB,
 				borderRadius: 4,
 				boxShadow: '0 3px 3px 0 rgba(0, 0, 0, 0.14), 0 1px 7px 0 rgba(0, 0, 0, 0.12), 0 3px 1px -1px rgba(0, 0, 0, 0.2)'
@@ -531,8 +603,7 @@ class Footer extends Component {
 				<div style={{
 					paddingLeft: 10
 				}}>
-					{headMotionList}
-					{tailMotionList}
+					{motionList}
 				</div>
 			</div>
 		);
