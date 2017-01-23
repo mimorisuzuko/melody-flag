@@ -20,5 +20,6 @@ e.g.)
 ```bash
 npm run webpack -- -w
 # npm run watch
+npm run server
 open http://localhost:3000
 ```
