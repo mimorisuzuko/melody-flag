@@ -550,7 +550,7 @@ class Motion extends Component {
 
 	static get LIST() {
 		return [
-			{ name: 'takeoff', Element: MdFlightTakeoff },
+			{ name: 'takeOff', Element: MdFlightTakeoff },
 			{ name: 'land', Element: MdFlightLand },
 			{ name: 'up', Element: FaAngleDoubleUp },
 			{ name: 'down', Element: FaAngleDoubleDown },

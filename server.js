@@ -48,8 +48,18 @@ app.get('/authorize', (req, res) => {
 });
 
 app.post('/motion', (req, res) => {
-	const {body} = req;
-	console.log(body);
+	const {body: {name, uuid}} = req;
+	const drone = watcher.drone(uuid);
+	console.log(`${name}	${uuid}`);
+
+	if (drone) {
+		if (name === 'takeOff') {
+			drone.takeOff();
+		} else if (name === 'land') {
+			drone.land();
+		}
+	}
+
 	res.sendStatus(200);
 });
 
