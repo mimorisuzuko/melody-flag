@@ -359,6 +359,7 @@ class Timeline extends Component {
 	constructor(props) {
 		super(props);
 
+		this.tempIndex = -1;
 		this.state = {
 			motionList: List()
 		};
@@ -373,7 +374,7 @@ class Timeline extends Component {
 		const {FPS: fps, INTERVAL: interval, HEIGHT: height} = Timeline;
 		const keyframes = [];
 		const uuid = model.get('uuid');
-		const motions = motionList.map((model) => {
+		const motions = motionList.map((model, i) => {
 			if (!model) { return null; }
 			const keyframe = model.get('keyframe');
 			const name = model.get('name');
@@ -389,7 +390,7 @@ class Timeline extends Component {
 			}
 
 			return (
-				<Motion name={name} style={{
+				<Motion onDragStart={this.onDragStartMotion.bind(this)} onDragEnd={this.onDragEndMotion.bind(this, i)} name={name} style={{
 					position: 'absolute',
 					top: height / 2 - dy / 2,
 					left: keyframe * interval - dy / 2
@@ -465,7 +466,22 @@ class Timeline extends Component {
 		const keyframe = Math.round(x / interval);
 		const {name} = JSON.parse(dataTransfer.getData('text/plain'));
 
+		this.tempIndex = keyframe;
 		this.setState({ motionList: motionList.set(keyframe, new MotionModel({ name, keyframe })) });
+	}
+
+	onDragStartMotion() {
+		this.tempIndex = -1;
+	}
+
+	/**
+	 * @param {number} index
+	 */
+	onDragEndMotion(index) {
+		const {tempIndex, state: {motionList}} = this;
+
+		if (tempIndex === index) { return; }
+		this.setState({ motionList: motionList.delete(index) });
 	}
 
 	static get HEIGHT() {
@@ -489,7 +505,7 @@ class Motion extends Component {
 		const {SIZE: size} = Motion;
 
 		return (
-			<div draggable onDragStart={this.onDragStart.bind(this)} style={_.assign({
+			<div draggable onDragStart={this.onDragStart.bind(this)} onDragEnd={this.onDragEnd.bind(this)} style={_.assign({
 				width: size,
 				height: size,
 				borderRadius: '50%',
@@ -508,10 +524,24 @@ class Motion extends Component {
 	 * @param {DragEvent} e
 	 */
 	onDragStart(e) {
-		const {props: {name}} = this;
+		const {props: {name, onDragStart}} = this;
 		const {dataTransfer} = e;
 
 		dataTransfer.setData('text/plain', JSON.stringify({ name }));
+		onDragStart();
+	}
+
+	onDragEnd() {
+		const {props: {onDragEnd}} = this;
+
+		onDragEnd();
+	}
+
+	static get defaultProps() {
+		return {
+			onDragStart: () => { },
+			onDragEnd: () => { }
+		};
 	}
 
 	static get SIZE() {
