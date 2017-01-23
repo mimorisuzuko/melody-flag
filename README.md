@@ -17,7 +17,8 @@ e.g.)
 
 ## Development
 
-```
-gulp watch
+```bash
+npm run webpack -- -w
+# npm run watch
 open http://localhost:3000
 ```
