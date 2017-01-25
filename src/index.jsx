@@ -524,8 +524,8 @@ class Timeline extends Component {
 		const uuid = model.get('uuid');
 		const motions = motionList.map((model, i) => {
 			if (!model) { return null; }
-			const keyframe = model.get('keyframe');
-			const name = model.get('name');
+			const json = model.toJS();
+			const {keyframe} = json;
 
 			if (currentFrame !== prevFrame && currentFrame === keyframe) {
 				fetch('/motion', {
@@ -533,8 +533,8 @@ class Timeline extends Component {
 					headers: {
 						'Content-Type': 'application/json'
 					},
-					body: JSON.stringify({ name, keyframe, uuid })
-				}).then((r) => r.text()).then((r) => console.log('Send a motion!', keyframe, name));
+					body: JSON.stringify(json)
+				}).then((r) => r.text()).then((r) => console.log('Send a motion!', json));
 			}
 
 			return (
@@ -543,7 +543,7 @@ class Timeline extends Component {
 					onClick={this.onClickMotion.bind(this, i)}
 					onDragStart={this.onDragStartMotion.bind(this)}
 					onDragEnd={this.onDragEndMotion.bind(this, i)}
-					name={name}
+					model={model}
 					style={{
 						position: 'absolute',
 						top: height / 2 - dy / 2,
@@ -619,10 +619,10 @@ class Timeline extends Component {
 		const {INTERVAL: interval} = Timeline;
 		const x = clientX - left;
 		const keyframe = Math.round(x / interval);
-		const {name} = JSON.parse(dataTransfer.getData('text/plain'));
+		const {name, speed, steps} = JSON.parse(dataTransfer.getData('text/plain'));
 
 		this.tempIndex = keyframe;
-		this.setState({ motionList: motionList.set(keyframe, new MotionModel({ name, keyframe })) });
+		this.setState({ motionList: motionList.set(keyframe, new MotionModel({ name, keyframe, speed, steps })) });
 	}
 
 	/**
@@ -690,8 +690,9 @@ class Timeline extends Component {
 
 class Motion extends Component {
 	render() {
-		const {props: {name, style, className}} = this;
+		const {props: {model, style, className}} = this;
 		const {LIST: list} = Motion;
+		const name = model.get('name');
 		const {Element} = _.find(list, { name });
 		const {SIZE: size} = Motion;
 
@@ -729,10 +730,10 @@ class Motion extends Component {
 	 * @param {DragEvent} e
 	 */
 	onDragStart(e) {
-		const {props: {name, onDragStart}} = this;
+		const {props: {model, onDragStart}} = this;
 		const {dataTransfer} = e;
 
-		dataTransfer.setData('text/plain', JSON.stringify({ name }));
+		dataTransfer.setData('text/plain', JSON.stringify(model.toJS()));
 		onDragStart();
 	}
 
@@ -791,7 +792,7 @@ class Footer extends Component {
 				display: 'flex',
 				flexDirection: 'row'
 			}}>
-				{_.map(a, ({name}) => <Motion name={name} />)}
+				{_.map(a, ({name}) => <Motion model={new MotionModel({ name })} />)}
 			</div>
 		));
 
