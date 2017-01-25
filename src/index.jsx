@@ -18,7 +18,7 @@ const lblackRGB = black.lighten(0.2).string();
 const llblackRGB = black.lighten(0.6).string();
 const blackRGB = black.string();
 
-class PlayerModel extends Record({ currentTime: 0, totalTime: 0, paused: true, id: '' }) { }
+class PlayerModel extends Record({ currentTime: 0, totalTime: 0, paused: true, id: '', loading: true }) { }
 
 class DroneModel extends Record({ uuid: '', name: '' }) { }
 
@@ -99,8 +99,9 @@ class App extends Component {
 	onTimer(e) {
 		const {state: {player}} = this;
 		const {data: {currentTime, totalTime}} = e;
+		const loading = false;
 
-		this.setState({ player: player.merge({ currentTime, totalTime }) });
+		this.setState({ player: player.merge({ currentTime, totalTime, loading }) });
 	}
 
 	render() {
@@ -125,13 +126,13 @@ class App extends Component {
 	 */
 	onClickTrack(id, totalTime) {
 		const {state: {player}} = this;
+
+		if (player.get('id') === id) { return; }
+		const loading = true;
 		const currentTime = 0;
 
-		if (player.get('id') !== id) {
-			Rhapsody.player.pause();
-		}
-
-		this.setState({ player: player.merge({ id, totalTime, currentTime }) });
+		Rhapsody.player.pause();
+		this.setState({ player: player.merge({ id, totalTime, currentTime, loading }) });
 	}
 }
 
@@ -590,11 +591,14 @@ class Timeline extends Component {
 	 * @param {MouseEvent} e
 	 */
 	onClick(e) {
+		const {props: {player}} = this;
 		const {INTERVAL: interval, FPS: fps} = Timeline;
 		const {target, currentTarget, clientX} = e;
 		const {left} = currentTarget.getBoundingClientRect();
 		const x = clientX - left;
 		const t = x / interval / fps;
+
+		if (player.get('loading')) { return; }
 
 		Rhapsody.player.seek(t);
 	}
