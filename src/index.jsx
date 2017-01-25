@@ -26,12 +26,14 @@ class App extends Component {
 	constructor(props) {
 		super(props);
 
-		const {accessToken, refreshToken, consumerKey} = qs.parse(location.search.substring(1));
+		/** @type {{accessToken: string, refreshToken: string, consumerKey: string, debugNumber: number}} */
+		const {accessToken, refreshToken, consumerKey, debugNumber} = qs.parse(location.search.substring(1));
 		Rhapsody.init({ consumerKey });
 		Rhapsody.player.on('ready', this.onReady.bind(this, accessToken, refreshToken));
 		Rhapsody.player.on('playevent', this.onPlay.bind(this));
 		Rhapsody.player.on('playtimer', this.onTimer.bind(this));
 
+		this.debugNumber = debugNumber;
 		this.state = {
 			trackList: List(),
 			player: new PlayerModel(),
@@ -42,7 +44,10 @@ class App extends Component {
 	}
 
 	draw() {
-		fetch('/drones').then((r) => r.json()).then((r) => {
+		const {debugNumber} = this;
+		const q = qs.stringify({ debugNumber });
+
+		fetch(`/drones?${q}`).then((r) => r.json()).then((r) => {
 			const {state: {droneList}} = this;
 
 			this.setState({ droneList: droneList.merge(r) });
@@ -130,6 +135,109 @@ class App extends Component {
 	}
 }
 
+class MotionEditorModel extends Record({ x: 0, y: 0, visible: false }) {
+
+	/**
+	 * @param {number} x
+	 * @param {number} y
+	 */
+	toggle(x, y) {
+		let {visible} = this;
+
+		visible = !visible;
+		y += 2;
+		return this.merge({ x, y, visible });
+	}
+}
+
+class MotionEditor extends Component {
+	constructor(props) {
+		super(props);
+
+		document.body.addEventListener('mousedown', this.onMouseDownBody.bind(this));
+	}
+
+	/**
+	 * @param {MouseEvent} e
+	 */
+	onMouseDownBody(e) {
+		const {props: {hide}} = this;
+		const {target} = e;
+		const {TARGET_CLASS_NAME: className} = MotionEditor;
+
+		if (_.some(document.querySelectorAll(`.${className}`), (a) => a.contains(target))) { return; }
+		hide();
+	}
+
+	render() {
+		const {TARGET_CLASS_NAME: className} = MotionEditor;
+		const {props: {model}} = this;
+		const left = model.get('x');
+		const top = model.get('y');
+		const visible = model.get('visible');
+		const {LIST: list} = Motion;
+		const options = _.map(list, ({name}) => <option value={name}>{name}</option>);
+		const style = {
+			display: 'flex',
+			flexDirection: 'row'
+		};
+		const hstyle = {
+			textTransform: 'uppercase',
+			backgroundColor: lblackRGB,
+			padding: '5px 10px'
+		};
+		const cstyle = {
+			padding: '5px 10px'
+		};
+		const input = <input type='number' style={{
+			backgroundColor: lblackRGB,
+			border: 'none',
+			outline: 'none'
+		}} />;
+
+		return (
+			visible ? <div className={className} style={{
+				boxShadow: '0 3px 3px 0 rgba(0, 0, 0, 0.14), 0 1px 7px 0 rgba(0, 0, 0, 0.12), 0 3px 1px -1px rgba(0, 0, 0, 0.2)',
+				position: 'absolute',
+				left,
+				top,
+				backgroundColor: blackRGB,
+			}}>
+				<div style={hstyle}>Name</div>
+				<div style={cstyle}>
+					<select style={{
+						width: '100%',
+						backgroundColor: lblackRGB,
+						border: 'none',
+						outline: 'none'
+					}}>
+						{options}
+					</select>
+				</div>
+				<div style={hstyle}>Values</div>
+				<div>
+					<div style={style}>
+						<div style={cstyle}>Speed</div>
+						<div style={cstyle}>
+							{input}
+						</div>
+					</div>
+					<div style={style}>
+						<div style={cstyle}>Steps</div>
+						<div style={cstyle}>
+							{input}
+						</div>
+					</div>
+				</div>
+			</div> : null
+		);
+	}
+
+	static get TARGET_CLASS_NAME() {
+		return 'click-target-for-motion-editor';
+	}
+}
+
 class Body extends Component {
 	shouldComponentUpdate(nextProps) {
 		const {props} = this;
@@ -146,7 +254,7 @@ class Body extends Component {
 			<div style={{
 				height: '100%',
 				display: 'flex',
-				flexDirection: 'row',
+				flexDirection: 'row'
 			}}>
 				<TrackList list={trackList} player={player} onClickTrack={onClickTrack} />
 				<TimelineList player={player} droneList={droneList} />
@@ -284,12 +392,16 @@ class TimelineList extends Component {
 	constructor(props) {
 		super(props);
 
+		this.state = {
+			motionEditorModel: new MotionEditorModel()
+		};
 		this.prevFrame = -1;
 	}
 
 	render() {
 		const {
 			props: {droneList, player},
+			state: {motionEditorModel},
 			prevFrame
 		} = this;
 		const {WIDTH: dwidth} = TrackList;
@@ -316,7 +428,8 @@ class TimelineList extends Component {
 			<div style={{
 				display: 'flex',
 				flexDirection: 'column',
-				width: `calc(100% - ${dwidth}px)`
+				width: `calc(100% - ${dwidth}px)`,
+				position: 'relative'
 			}}>
 				<NavTitle text='Timeline' />
 				<div style={{
@@ -338,18 +451,40 @@ class TimelineList extends Component {
 							{grid}
 						</g>
 					</svg>
-					{droneList.map((model) => <Timeline
+					{droneList.map((model, i) => <Timeline
 						currentFrame={currentFrame}
 						prevFrame={prevFrame}
 						model={model}
 						player={player}
 						keyframesNumber={keyframesNumber}
 						width={width}
+						index={i}
+						onClickMotion={this.toggleMotionEditor.bind(this)}
 						/>
 					)}
 				</div>
+				<MotionEditor model={motionEditorModel} hide={this.hideMotionEditor.bind(this)} />
 			</div>
 		);
+	}
+
+	hideMotionEditor() {
+		const {state: {motionEditorModel}} = this;
+
+		this.setState({ motionEditorModel: motionEditorModel.set('visible', false) });
+	}
+
+	/**
+	 * @param {number} x
+	 * @param {number} y
+	 */
+	toggleMotionEditor(x, y) {
+		const {state: {motionEditorModel}} = this;
+		const {left, top} = ReactDOM.findDOMNode(this).getBoundingClientRect();
+
+		x -= left;
+		y -= top;
+		this.setState({ motionEditorModel: motionEditorModel.toggle(x, y) });
 	}
 }
 
@@ -370,6 +505,7 @@ class Timeline extends Component {
 			props: {model, player, prevFrame, currentFrame, width, keyframesNumber},
 			state: {motionList},
 		} = this;
+		const {TARGET_CLASS_NAME: motionClassName} = MotionEditor;
 		const {SIZE: dy} = Motion;
 		const {FPS: fps, INTERVAL: interval, HEIGHT: height} = Timeline;
 		const keyframes = [];
@@ -390,11 +526,17 @@ class Timeline extends Component {
 			}
 
 			return (
-				<Motion onDragStart={this.onDragStartMotion.bind(this)} onDragEnd={this.onDragEndMotion.bind(this, i)} name={name} style={{
-					position: 'absolute',
-					top: height / 2 - dy / 2,
-					left: keyframe * interval - dy / 2
-				}} />
+				<Motion
+					className={motionClassName}
+					onClick={this.onClickMotion.bind(this, i)}
+					onDragStart={this.onDragStartMotion.bind(this)}
+					onDragEnd={this.onDragEndMotion.bind(this, i)}
+					name={name}
+					style={{
+						position: 'absolute',
+						top: height / 2 - dy / 2,
+						left: keyframe * interval - dy / 2
+					}} />
 			);
 		});
 
@@ -470,6 +612,18 @@ class Timeline extends Component {
 		this.setState({ motionList: motionList.set(keyframe, new MotionModel({ name, keyframe })) });
 	}
 
+	/**
+	 * @param {number} motionIndex
+	 * @param {MouseEvent} e
+	 */
+	onClickMotion(motionIndex, e) {
+		const {props: {onClickMotion}} = this;
+		const {currentTarget} = e;
+		const {left, top, height} = currentTarget.getBoundingClientRect();
+
+		onClickMotion(left, top + height);
+	}
+
 	onDragStartMotion() {
 		this.tempIndex = -1;
 	}
@@ -499,25 +653,39 @@ class Timeline extends Component {
 
 class Motion extends Component {
 	render() {
-		const {props: {name, style}} = this;
+		const {props: {name, style, className}} = this;
 		const {LIST: list} = Motion;
 		const {Element} = _.find(list, { name });
 		const {SIZE: size} = Motion;
 
 		return (
-			<div draggable onDragStart={this.onDragStart.bind(this)} onDragEnd={this.onDragEnd.bind(this)} style={_.assign({
-				width: size,
-				height: size,
-				borderRadius: '50%',
-				backgroundColor: blueRGB,
-				textAlign: 'center',
-				lineHeight: `${size}px`,
-				cursor: 'pointer',
-				opacity: 0.9999
-			}, style)}>
+			<div draggable
+				className={className}
+				onClick={this.onClick.bind(this)}
+				onDragStart={this.onDragStart.bind(this)}
+				onDragEnd={this.onDragEnd.bind(this)}
+				style={_.assign({
+					width: size,
+					height: size,
+					borderRadius: '50%',
+					backgroundColor: blueRGB,
+					textAlign: 'center',
+					lineHeight: `${size}px`,
+					cursor: 'pointer',
+					opacity: 0.9999
+				}, style)}>
 				<Element size={16} />
 			</div>
 		);
+	}
+
+	/**
+	 * @param {MouseEvent}
+	 */
+	onClick(e) {
+		const {props: {onClick}} = this;
+
+		onClick(e);
 	}
 
 	/**
@@ -539,6 +707,7 @@ class Motion extends Component {
 
 	static get defaultProps() {
 		return {
+			onClick: () => { },
 			onDragStart: () => { },
 			onDragEnd: () => { }
 		};
