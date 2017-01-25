@@ -2,6 +2,8 @@
 
 ハッカソンのアレ
 
+![](ss.png)
+
 ## Setup
 
 Write keys in `settings/settings.json`

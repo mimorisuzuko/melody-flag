@@ -18,7 +18,7 @@ const lblackRGB = black.lighten(0.2).string();
 const llblackRGB = black.lighten(0.6).string();
 const blackRGB = black.string();
 
-class PlayerModel extends Record({ currentTime: 0, totalTime: 0, paused: true, id: '' }) { }
+class PlayerModel extends Record({ currentTime: 0, totalTime: 0, paused: true, id: '', loading: true }) { }
 
 class DroneModel extends Record({ uuid: '', name: '' }) { }
 
@@ -26,12 +26,14 @@ class App extends Component {
 	constructor(props) {
 		super(props);
 
-		const {accessToken, refreshToken, consumerKey} = qs.parse(location.search.substring(1));
+		/** @type {{accessToken: string, refreshToken: string, consumerKey: string, debugNumber: number}} */
+		const {accessToken, refreshToken, consumerKey, debugNumber} = qs.parse(location.search.substring(1));
 		Rhapsody.init({ consumerKey });
 		Rhapsody.player.on('ready', this.onReady.bind(this, accessToken, refreshToken));
 		Rhapsody.player.on('playevent', this.onPlay.bind(this));
 		Rhapsody.player.on('playtimer', this.onTimer.bind(this));
 
+		this.debugNumber = debugNumber;
 		this.state = {
 			trackList: List(),
 			player: new PlayerModel(),
@@ -42,7 +44,10 @@ class App extends Component {
 	}
 
 	draw() {
-		fetch('/drones').then((r) => r.json()).then((r) => {
+		const {debugNumber} = this;
+		const q = qs.stringify({ debugNumber });
+
+		fetch(`/drones?${q}`).then((r) => r.json()).then((r) => {
 			const {state: {droneList}} = this;
 
 			this.setState({ droneList: droneList.merge(r) });
@@ -94,8 +99,9 @@ class App extends Component {
 	onTimer(e) {
 		const {state: {player}} = this;
 		const {data: {currentTime, totalTime}} = e;
+		const loading = false;
 
-		this.setState({ player: player.merge({ currentTime, totalTime }) });
+		this.setState({ player: player.merge({ currentTime, totalTime, loading }) });
 	}
 
 	render() {
@@ -120,13 +126,13 @@ class App extends Component {
 	 */
 	onClickTrack(id, totalTime) {
 		const {state: {player}} = this;
+
+		if (player.get('id') === id) { return; }
+		const loading = true;
 		const currentTime = 0;
 
-		if (player.get('id') !== id) {
-			Rhapsody.player.pause();
-		}
-
-		this.setState({ player: player.merge({ id, totalTime, currentTime }) });
+		Rhapsody.player.pause();
+		this.setState({ player: player.merge({ id, totalTime, currentTime, loading }) });
 	}
 }
 
@@ -146,7 +152,7 @@ class Body extends Component {
 			<div style={{
 				height: '100%',
 				display: 'flex',
-				flexDirection: 'row',
+				flexDirection: 'row'
 			}}>
 				<TrackList list={trackList} player={player} onClickTrack={onClickTrack} />
 				<TimelineList player={player} droneList={droneList} />
@@ -316,7 +322,8 @@ class TimelineList extends Component {
 			<div style={{
 				display: 'flex',
 				flexDirection: 'column',
-				width: `calc(100% - ${dwidth}px)`
+				width: `calc(100% - ${dwidth}px)`,
+				position: 'relative'
 			}}>
 				<NavTitle text='Timeline' />
 				<div style={{
@@ -338,13 +345,14 @@ class TimelineList extends Component {
 							{grid}
 						</g>
 					</svg>
-					{droneList.map((model) => <Timeline
+					{droneList.map((model, i) => <Timeline
 						currentFrame={currentFrame}
 						prevFrame={prevFrame}
 						model={model}
 						player={player}
 						keyframesNumber={keyframesNumber}
 						width={width}
+						index={i}
 						/>
 					)}
 				</div>
@@ -353,7 +361,146 @@ class TimelineList extends Component {
 	}
 }
 
-class MotionModel extends Record({ name: '', keyframe: 0 }) { }
+class MotionModel extends Record({ name: '', keyframe: 0, speed: 50, steps: 50 }) {
+	static get MIN_VALUE() {
+		return 0;
+	}
+
+	static get MAX_VALUE() {
+		return 100;
+	}
+}
+
+class MotionEditorModel extends Record({ x: 0, y: 0, visible: false, motionModel: new MotionModel() }) {
+
+	/**
+	 * @param {number} x
+	 * @param {number} y
+	 * @param {MotionModel} motionModel
+	 */
+	toggle(x, y, motionModel) {
+		let {visible} = this;
+
+		visible = !visible;
+		y += 2;
+		return this.merge({ x, y, visible, motionModel });
+	}
+}
+
+class MotionEditor extends Component {
+	constructor(props) {
+		super(props);
+
+		document.body.addEventListener('mousedown', this.onMouseDownBody.bind(this));
+	}
+
+	/**
+	 * @param {MouseEvent} e
+	 */
+	onMouseDownBody(e) {
+		const {props: {hide}} = this;
+		const {target: $t} = e;
+		const {TARGET_CLASS_NAME: className} = MotionEditor;
+		const $nodes = document.querySelectorAll(`.${className}`);
+		const $e = ReactDOM.findDOMNode(this);
+
+		if (_.some($nodes, (a) => a.contains($t)) || ($e ? $e.contains($t) : false)) { return; }
+		hide();
+	}
+
+	render() {
+		const {TARGET_CLASS_NAME: className} = MotionEditor;
+		const {props: {model}} = this;
+		const motion = model.get('motionModel');
+		const left = model.get('x');
+		const top = model.get('y');
+		const visible = model.get('visible');
+		const {LIST: list} = Motion;
+		const motionName = motion.get('name');
+		const options = _.map(list, ({name}) => <option selected={name === motionName} value={name}>{name}</option>);
+		const style = {
+			display: 'flex',
+			flexDirection: 'row'
+		};
+		const hstyle = {
+			textTransform: 'uppercase',
+			backgroundColor: lblackRGB,
+			padding: '5px 10px'
+		};
+		const cstyle = {
+			padding: '5px 10px'
+		};
+		const {MIN_VALUE: minValue, MAX_VALUE: maxValue} = MotionModel;
+		const [speedInput, stepsInput] = _.map(['speed', 'steps'], (name) => {
+			const value = motion.get(name);
+
+			return <input type='number'
+				onChange={this.onChange.bind(this, name)}
+				min={minValue}
+				maxValue={maxValue}
+				disabled={!Motion.hasValues(motionName)}
+				value={value}
+				style={{
+					backgroundColor: lblackRGB,
+					border: 'none',
+					outline: 'none'
+				}} />;
+		});
+
+		return (
+			visible ? <div style={{
+				boxShadow: '0 3px 3px 0 rgba(0, 0, 0, 0.14), 0 1px 7px 0 rgba(0, 0, 0, 0.12), 0 3px 1px -1px rgba(0, 0, 0, 0.2)',
+				position: 'absolute',
+				left,
+				top,
+				backgroundColor: blackRGB,
+				zIndex: 2
+			}}>
+				<div style={hstyle}>Name</div>
+				<div style={cstyle}>
+					<select onChange={this.onChange.bind(this, 'name')} style={{
+						width: '100%',
+						backgroundColor: lblackRGB,
+						border: 'none',
+						outline: 'none'
+					}}>
+						{options}
+					</select>
+				</div>
+				<div style={hstyle}>Values</div>
+				<div>
+					<div style={style}>
+						<div style={cstyle}>Speed</div>
+						<div style={cstyle}>
+							{speedInput}
+						</div>
+					</div>
+					<div style={style}>
+						<div style={cstyle}>Steps</div>
+						<div style={cstyle}>
+							{stepsInput}
+						</div>
+					</div>
+				</div>
+			</div> : null
+		);
+	}
+
+	/**
+	 * @param {string} name
+	 * @param {Event} e
+	 */
+	onChange(name, e) {
+		const {props: {onChange, model}} = this;
+		const {target: {value}} = e;
+
+		onChange(model.get('motionModel').set(name, value));
+	}
+
+	static get TARGET_CLASS_NAME() {
+		return 'click-target-for-motion-editor';
+	}
+}
 
 class Timeline extends Component {
 	constructor(props) {
@@ -361,6 +508,7 @@ class Timeline extends Component {
 
 		this.tempIndex = -1;
 		this.state = {
+			motionEditorModel: new MotionEditorModel(),
 			motionList: List()
 		};
 	}
@@ -368,33 +516,40 @@ class Timeline extends Component {
 	render() {
 		const {
 			props: {model, player, prevFrame, currentFrame, width, keyframesNumber},
-			state: {motionList},
+			state: {motionList, motionEditorModel},
 		} = this;
+		const {TARGET_CLASS_NAME: motionClassName} = MotionEditor;
 		const {SIZE: dy} = Motion;
 		const {FPS: fps, INTERVAL: interval, HEIGHT: height} = Timeline;
 		const keyframes = [];
 		const uuid = model.get('uuid');
 		const motions = motionList.map((model, i) => {
 			if (!model) { return null; }
-			const keyframe = model.get('keyframe');
-			const name = model.get('name');
+			const json = model.toJS();
+			const {keyframe} = json;
 
-			if (currentFrame !== prevFrame && currentFrame === keyframe) {
+			if (!player.get('paused') && currentFrame !== prevFrame && currentFrame === keyframe) {
 				fetch('/motion', {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json'
 					},
-					body: JSON.stringify({ name, keyframe, uuid })
-				}).then((r) => r.text()).then((r) => console.log('Send a motion!', keyframe, name));
+					body: JSON.stringify(_.merge({ uuid }, json))
+				}).then((r) => r.text()).then((r) => console.log('Send a motion!', json));
 			}
 
 			return (
-				<Motion onDragStart={this.onDragStartMotion.bind(this)} onDragEnd={this.onDragEndMotion.bind(this, i)} name={name} style={{
-					position: 'absolute',
-					top: height / 2 - dy / 2,
-					left: keyframe * interval - dy / 2
-				}} />
+				<Motion
+					className={motionClassName}
+					onClick={this.onClickMotion.bind(this, i)}
+					onDragStart={this.onDragStartMotion.bind(this)}
+					onDragEnd={this.onDragEndMotion.bind(this, i)}
+					model={model}
+					style={{
+						position: 'absolute',
+						top: height / 2 - dy / 2,
+						left: keyframe * interval - dy / 2
+					}} />
 			);
 		});
 
@@ -427,6 +582,7 @@ class Timeline extends Component {
 					</g>
 					<rect width={1} height='100%' x={currentFrame * interval} fill={blueRGB} stroke='none'></rect>
 				</svg>
+				<MotionEditor model={motionEditorModel} hide={this.hideMotionEditor.bind(this)} onChange={this.changeMotionValue.bind(this)} />
 			</div>
 		);
 	}
@@ -435,11 +591,14 @@ class Timeline extends Component {
 	 * @param {MouseEvent} e
 	 */
 	onClick(e) {
+		const {props: {player}} = this;
 		const {INTERVAL: interval, FPS: fps} = Timeline;
 		const {target, currentTarget, clientX} = e;
 		const {left} = currentTarget.getBoundingClientRect();
 		const x = clientX - left;
 		const t = x / interval / fps;
+
+		if (player.get('loading')) { return; }
 
 		Rhapsody.player.seek(t);
 	}
@@ -464,14 +623,31 @@ class Timeline extends Component {
 		const {INTERVAL: interval} = Timeline;
 		const x = clientX - left;
 		const keyframe = Math.round(x / interval);
-		const {name} = JSON.parse(dataTransfer.getData('text/plain'));
+		const {name, speed, steps} = JSON.parse(dataTransfer.getData('text/plain'));
 
 		this.tempIndex = keyframe;
-		this.setState({ motionList: motionList.set(keyframe, new MotionModel({ name, keyframe })) });
+		this.setState({ motionList: motionList.set(keyframe, new MotionModel({ name, keyframe, speed, steps })) });
+	}
+
+	/**
+	 * @param {number} motionIndex
+	 * @param {MouseEvent} e
+	 */
+	onClickMotion(motionIndex, e) {
+		const {
+			props: {onClickMotion},
+			state: {motionEditorModel, motionList}
+		} = this;
+		const {currentTarget} = e;
+		const {left: x, top: y, height} = currentTarget.getBoundingClientRect();
+		const {left, top} = ReactDOM.findDOMNode(this).getBoundingClientRect();
+
+		this.setState({ motionEditorModel: motionEditorModel.toggle(x - left, y - top + height, motionList.get(motionIndex)) });
 	}
 
 	onDragStartMotion() {
 		this.tempIndex = -1;
+		this.hideMotionEditor();
 	}
 
 	/**
@@ -482,6 +658,25 @@ class Timeline extends Component {
 
 		if (tempIndex === index) { return; }
 		this.setState({ motionList: motionList.delete(index) });
+	}
+
+	/**
+	 * @param {MotionModel} motionModel
+	 */
+	changeMotionValue(motionModel) {
+		const {state: {motionList, motionEditorModel}} = this;
+		const index = motionModel.get('keyframe');
+
+		this.setState({
+			motionList: motionList.set(index, motionModel),
+			motionEditorModel: motionEditorModel.set('motionModel', motionModel)
+		});
+	}
+
+	hideMotionEditor() {
+		const {state: {motionEditorModel}} = this;
+
+		this.setState({ motionEditorModel: motionEditorModel.set('visible', false) });
 	}
 
 	static get HEIGHT() {
@@ -499,35 +694,50 @@ class Timeline extends Component {
 
 class Motion extends Component {
 	render() {
-		const {props: {name, style}} = this;
+		const {props: {model, style, className}} = this;
 		const {LIST: list} = Motion;
+		const name = model.get('name');
 		const {Element} = _.find(list, { name });
 		const {SIZE: size} = Motion;
 
 		return (
-			<div draggable onDragStart={this.onDragStart.bind(this)} onDragEnd={this.onDragEnd.bind(this)} style={_.assign({
-				width: size,
-				height: size,
-				borderRadius: '50%',
-				backgroundColor: blueRGB,
-				textAlign: 'center',
-				lineHeight: `${size}px`,
-				cursor: 'pointer',
-				opacity: 0.9999
-			}, style)}>
+			<div draggable
+				className={className}
+				onClick={this.onClick.bind(this)}
+				onDragStart={this.onDragStart.bind(this)}
+				onDragEnd={this.onDragEnd.bind(this)}
+				style={_.assign({
+					width: size,
+					height: size,
+					borderRadius: '50%',
+					backgroundColor: blueRGB,
+					textAlign: 'center',
+					lineHeight: `${size}px`,
+					cursor: 'pointer',
+					opacity: 0.9999
+				}, style)}>
 				<Element size={16} />
 			</div>
 		);
 	}
 
 	/**
+	 * @param {MouseEvent}
+	 */
+	onClick(e) {
+		const {props: {onClick}} = this;
+
+		onClick(e);
+	}
+
+	/**
 	 * @param {DragEvent} e
 	 */
 	onDragStart(e) {
-		const {props: {name, onDragStart}} = this;
+		const {props: {model, onDragStart}} = this;
 		const {dataTransfer} = e;
 
-		dataTransfer.setData('text/plain', JSON.stringify({ name }));
+		dataTransfer.setData('text/plain', JSON.stringify(model.toJS()));
 		onDragStart();
 	}
 
@@ -539,6 +749,7 @@ class Motion extends Component {
 
 	static get defaultProps() {
 		return {
+			onClick: () => { },
 			onDragStart: () => { },
 			onDragEnd: () => { }
 		};
@@ -546,6 +757,14 @@ class Motion extends Component {
 
 	static get SIZE() {
 		return 24;
+	}
+
+	/**
+	 * @param {string} name
+	 * @returns {boolean}
+	 */
+	static hasValues(name) {
+		return _.includes(['up', 'down', 'turnRight', 'turnLeft', 'forward', 'backward', 'left', 'right'], name);
 	}
 
 	static get LIST() {
@@ -577,7 +796,7 @@ class Footer extends Component {
 				display: 'flex',
 				flexDirection: 'row'
 			}}>
-				{_.map(a, ({name}) => <Motion name={name} />)}
+				{_.map(a, ({name}) => <Motion model={new MotionModel({ name })} />)}
 			</div>
 		));
 

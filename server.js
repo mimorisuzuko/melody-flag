@@ -3,9 +3,12 @@ const libpath = require('path');
 const rq = require('request-promise');
 const qs = require('querystring');
 const bodyParser = require('body-parser');
+const minimist = require('minimist');
+const _ = require('lodash');
 const settings = require('./settings/index');
 const DroneWatcher = require('./drone-watcher');
-
+const {argv} = process;
+const {debug: debugNumber} = minimist(_.slice(argv, 2));
 const port = 3000;
 const baseUrl = `http://localhost:${port}`;
 const redirect_uri = `${baseUrl}/authorize`;
@@ -42,15 +45,15 @@ app.get('/authorize', (req, res) => {
 		}
 	}).then((body) => {
 		const {access_token: accessToken, refresh_token: refreshToken} = JSON.parse(body);
-		const q = qs.stringify({ accessToken, refreshToken, consumerKey: client_id });
+		const q = qs.stringify({ accessToken, refreshToken, consumerKey: client_id, debugNumber });
 		res.redirect(`${baseUrl}/docs?${q}`);
 	});
 });
 
 app.post('/motion', (req, res) => {
-	const {body: {name, uuid}} = req;
+	const {body: {name, uuid, speed, steps}} = req;
 	const drone = watcher.drone(uuid);
-	console.log(`${name}	${uuid}`);
+	console.log(`Name: ${name}, Speed: ${speed}, Steps: ${steps}, UUID: ${uuid}`);
 
 	if (drone) {
 		if (name === 'takeOff') {
@@ -64,7 +67,8 @@ app.post('/motion', (req, res) => {
 });
 
 app.get('/drones', (req, res) => {
-	res.json(watcher.connectedDrones());
+	const {query: {debugNumber}} = req;
+	res.json(watcher.connectedDrones(_.parseInt(debugNumber)));
 });
 
 app.listen(port);
