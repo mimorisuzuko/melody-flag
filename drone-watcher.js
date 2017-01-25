@@ -41,12 +41,14 @@ module.exports = class DroneWatcher {
 	}
 
 	/**
+	 * @param {number} debugNumber
 	 * @returns {{uuid: string, name: string}}
 	 */
-	connectedDrones() {
+	connectedDrones(debugNumber) {
 		const {_connectedDrones: drones} = this;
 
-		return _.map(drones, ({name, uuid}) => ({ name, uuid }));
+		return debugNumber ? _.map(Array(debugNumber), (a, i) => ({ name: `debug-${i}`, uuid: `uuid-${i}` }))
+			: _.map(drones, ({name, uuid}) => ({ name, uuid }));
 	}
 
 	/**

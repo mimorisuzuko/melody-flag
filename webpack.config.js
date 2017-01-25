@@ -1,10 +1,9 @@
 const webpack = require('webpack');
 const libpath = require('path');
-const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const CleanWebpackPlugin = require('clean-webpack-plugin');
 const dst = 'docs';
 
-module.exports = [{
+module.exports = {
 	entry: libpath.join(__dirname, 'src/'),
 	output: {
 		path: libpath.join(__dirname, dst),
@@ -30,7 +29,7 @@ module.exports = [{
 			root: __dirname,
 			verbose: false,
 			dry: false,
-			exclude: ['index.html']
+			exclude: ['index.html', 'index.css']
 		}),
 		new webpack.DefinePlugin({
 			'process.env': {
@@ -44,23 +43,4 @@ module.exports = [{
 			mangle: true
 		})
 	]
-}, {
-	entry: {
-		style: './src/index.scss'
-	},
-	output: {
-		path: libpath.join(__dirname, dst),
-		filename: 'index.css'
-	},
-	module: {
-		loaders: [
-			{
-				test: /\.scss$/,
-				loader: ExtractTextPlugin.extract('style-loader', 'css-loader?minimize!sass-loader')
-			}
-		]
-	},
-	plugins: [
-		new ExtractTextPlugin('index.css')
-	]
-}];
+};
