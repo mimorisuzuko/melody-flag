@@ -51,9 +51,9 @@ app.get('/authorize', (req, res) => {
 });
 
 app.post('/motion', (req, res) => {
-	const {body: {name, uuid}} = req;
+	const {body: {name, uuid, speed, steps}} = req;
 	const drone = watcher.drone(uuid);
-	console.log(`${name}	${uuid}`);
+	console.log(`Name: ${name}, Speed: ${speed}, Steps: ${steps}, UUID: ${uuid}`);
 
 	if (drone) {
 		if (name === 'takeOff') {

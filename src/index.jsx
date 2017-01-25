@@ -527,13 +527,13 @@ class Timeline extends Component {
 			const json = model.toJS();
 			const {keyframe} = json;
 
-			if (currentFrame !== prevFrame && currentFrame === keyframe) {
+			if (!player.get('paused') && currentFrame !== prevFrame && currentFrame === keyframe) {
 				fetch('/motion', {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json'
 					},
-					body: JSON.stringify(json)
+					body: JSON.stringify(_.merge({ uuid }, json))
 				}).then((r) => r.text()).then((r) => console.log('Send a motion!', json));
 			}
 
