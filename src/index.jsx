@@ -135,109 +135,6 @@ class App extends Component {
 	}
 }
 
-class MotionEditorModel extends Record({ x: 0, y: 0, visible: false }) {
-
-	/**
-	 * @param {number} x
-	 * @param {number} y
-	 */
-	toggle(x, y) {
-		let {visible} = this;
-
-		visible = !visible;
-		y += 2;
-		return this.merge({ x, y, visible });
-	}
-}
-
-class MotionEditor extends Component {
-	constructor(props) {
-		super(props);
-
-		document.body.addEventListener('mousedown', this.onMouseDownBody.bind(this));
-	}
-
-	/**
-	 * @param {MouseEvent} e
-	 */
-	onMouseDownBody(e) {
-		const {props: {hide}} = this;
-		const {target} = e;
-		const {TARGET_CLASS_NAME: className} = MotionEditor;
-
-		if (_.some(document.querySelectorAll(`.${className}`), (a) => a.contains(target))) { return; }
-		hide();
-	}
-
-	render() {
-		const {TARGET_CLASS_NAME: className} = MotionEditor;
-		const {props: {model}} = this;
-		const left = model.get('x');
-		const top = model.get('y');
-		const visible = model.get('visible');
-		const {LIST: list} = Motion;
-		const options = _.map(list, ({name}) => <option value={name}>{name}</option>);
-		const style = {
-			display: 'flex',
-			flexDirection: 'row'
-		};
-		const hstyle = {
-			textTransform: 'uppercase',
-			backgroundColor: lblackRGB,
-			padding: '5px 10px'
-		};
-		const cstyle = {
-			padding: '5px 10px'
-		};
-		const input = <input type='number' style={{
-			backgroundColor: lblackRGB,
-			border: 'none',
-			outline: 'none'
-		}} />;
-
-		return (
-			visible ? <div className={className} style={{
-				boxShadow: '0 3px 3px 0 rgba(0, 0, 0, 0.14), 0 1px 7px 0 rgba(0, 0, 0, 0.12), 0 3px 1px -1px rgba(0, 0, 0, 0.2)',
-				position: 'absolute',
-				left,
-				top,
-				backgroundColor: blackRGB,
-			}}>
-				<div style={hstyle}>Name</div>
-				<div style={cstyle}>
-					<select style={{
-						width: '100%',
-						backgroundColor: lblackRGB,
-						border: 'none',
-						outline: 'none'
-					}}>
-						{options}
-					</select>
-				</div>
-				<div style={hstyle}>Values</div>
-				<div>
-					<div style={style}>
-						<div style={cstyle}>Speed</div>
-						<div style={cstyle}>
-							{input}
-						</div>
-					</div>
-					<div style={style}>
-						<div style={cstyle}>Steps</div>
-						<div style={cstyle}>
-							{input}
-						</div>
-					</div>
-				</div>
-			</div> : null
-		);
-	}
-
-	static get TARGET_CLASS_NAME() {
-		return 'click-target-for-motion-editor';
-	}
-}
-
 class Body extends Component {
 	shouldComponentUpdate(nextProps) {
 		const {props} = this;
@@ -392,16 +289,12 @@ class TimelineList extends Component {
 	constructor(props) {
 		super(props);
 
-		this.state = {
-			motionEditorModel: new MotionEditorModel()
-		};
 		this.prevFrame = -1;
 	}
 
 	render() {
 		const {
 			props: {droneList, player},
-			state: {motionEditorModel},
 			prevFrame
 		} = this;
 		const {WIDTH: dwidth} = TrackList;
@@ -459,36 +352,154 @@ class TimelineList extends Component {
 						keyframesNumber={keyframesNumber}
 						width={width}
 						index={i}
-						onClickMotion={this.toggleMotionEditor.bind(this)}
 						/>
 					)}
 				</div>
-				<MotionEditor model={motionEditorModel} hide={this.hideMotionEditor.bind(this)} />
 			</div>
 		);
 	}
+}
 
-	hideMotionEditor() {
-		const {state: {motionEditorModel}} = this;
-
-		this.setState({ motionEditorModel: motionEditorModel.set('visible', false) });
+class MotionModel extends Record({ name: '', keyframe: 0, speed: 50, steps: 50 }) {
+	static get MIN_VALUE() {
+		return 0;
 	}
+
+	static get MAX_VALUE() {
+		return 100;
+	}
+}
+
+class MotionEditorModel extends Record({ x: 0, y: 0, visible: false, motionModel: new MotionModel() }) {
 
 	/**
 	 * @param {number} x
 	 * @param {number} y
+	 * @param {MotionModel} motionModel
 	 */
-	toggleMotionEditor(x, y) {
-		const {state: {motionEditorModel}} = this;
-		const {left, top} = ReactDOM.findDOMNode(this).getBoundingClientRect();
+	toggle(x, y, motionModel) {
+		let {visible} = this;
 
-		x -= left;
-		y -= top;
-		this.setState({ motionEditorModel: motionEditorModel.toggle(x, y) });
+		visible = !visible;
+		y += 2;
+		return this.merge({ x, y, visible, motionModel });
 	}
 }
 
-class MotionModel extends Record({ name: '', keyframe: 0 }) { }
+class MotionEditor extends Component {
+	constructor(props) {
+		super(props);
+
+		document.body.addEventListener('mousedown', this.onMouseDownBody.bind(this));
+	}
+
+	/**
+	 * @param {MouseEvent} e
+	 */
+	onMouseDownBody(e) {
+		const {props: {hide}} = this;
+		const {target: $t} = e;
+		const {TARGET_CLASS_NAME: className} = MotionEditor;
+		const $nodes = document.querySelectorAll(`.${className}`);
+		const $e = ReactDOM.findDOMNode(this);
+
+		if (_.some($nodes, (a) => a.contains($t)) || ($e ? $e.contains($t) : false)) { return; }
+		hide();
+	}
+
+	render() {
+		const {TARGET_CLASS_NAME: className} = MotionEditor;
+		const {props: {model}} = this;
+		const motion = model.get('motionModel');
+		const left = model.get('x');
+		const top = model.get('y');
+		const visible = model.get('visible');
+		const {LIST: list} = Motion;
+		const motionName = motion.get('name');
+		const options = _.map(list, ({name}) => <option selected={name === motionName} value={name}>{name}</option>);
+		const style = {
+			display: 'flex',
+			flexDirection: 'row'
+		};
+		const hstyle = {
+			textTransform: 'uppercase',
+			backgroundColor: lblackRGB,
+			padding: '5px 10px'
+		};
+		const cstyle = {
+			padding: '5px 10px'
+		};
+		const {MIN_VALUE: minValue, MAX_VALUE: maxValue} = MotionModel;
+		const [speedInput, stepsInput] = _.map(['speed', 'steps'], (name) => {
+			const value = motion.get(name);
+
+			return <input type='number'
+				onChange={this.onChange.bind(this, name)}
+				min={minValue}
+				maxValue={maxValue}
+				disabled={!Motion.hasValues(motionName)}
+				value={value}
+				style={{
+					backgroundColor: lblackRGB,
+					border: 'none',
+					outline: 'none'
+				}} />;
+		});
+
+		return (
+			visible ? <div style={{
+				boxShadow: '0 3px 3px 0 rgba(0, 0, 0, 0.14), 0 1px 7px 0 rgba(0, 0, 0, 0.12), 0 3px 1px -1px rgba(0, 0, 0, 0.2)',
+				position: 'absolute',
+				left,
+				top,
+				backgroundColor: blackRGB,
+				zIndex: 2
+			}}>
+				<div style={hstyle}>Name</div>
+				<div style={cstyle}>
+					<select onChange={this.onChange.bind(this, 'name')} style={{
+						width: '100%',
+						backgroundColor: lblackRGB,
+						border: 'none',
+						outline: 'none'
+					}}>
+						{options}
+					</select>
+				</div>
+				<div style={hstyle}>Values</div>
+				<div>
+					<div style={style}>
+						<div style={cstyle}>Speed</div>
+						<div style={cstyle}>
+							{speedInput}
+						</div>
+					</div>
+					<div style={style}>
+						<div style={cstyle}>Steps</div>
+						<div style={cstyle}>
+							{stepsInput}
+						</div>
+					</div>
+				</div>
+			</div> : null
+		);
+	}
+
+	/**
+	 * @param {string} name
+	 * @param {Event} e
+	 */
+	onChange(name, e) {
+		const {props: {onChange, model}} = this;
+		const {target: {value}} = e;
+
+		onChange(model.get('motionModel').set(name, value));
+	}
+
+	static get TARGET_CLASS_NAME() {
+		return 'click-target-for-motion-editor';
+	}
+}
 
 class Timeline extends Component {
 	constructor(props) {
@@ -496,6 +507,7 @@ class Timeline extends Component {
 
 		this.tempIndex = -1;
 		this.state = {
+			motionEditorModel: new MotionEditorModel(),
 			motionList: List()
 		};
 	}
@@ -503,7 +515,7 @@ class Timeline extends Component {
 	render() {
 		const {
 			props: {model, player, prevFrame, currentFrame, width, keyframesNumber},
-			state: {motionList},
+			state: {motionList, motionEditorModel},
 		} = this;
 		const {TARGET_CLASS_NAME: motionClassName} = MotionEditor;
 		const {SIZE: dy} = Motion;
@@ -569,6 +581,7 @@ class Timeline extends Component {
 					</g>
 					<rect width={1} height='100%' x={currentFrame * interval} fill={blueRGB} stroke='none'></rect>
 				</svg>
+				<MotionEditor model={motionEditorModel} hide={this.hideMotionEditor.bind(this)} onChange={this.changeMotionValue.bind(this)} />
 			</div>
 		);
 	}
@@ -617,15 +630,20 @@ class Timeline extends Component {
 	 * @param {MouseEvent} e
 	 */
 	onClickMotion(motionIndex, e) {
-		const {props: {onClickMotion}} = this;
+		const {
+			props: {onClickMotion},
+			state: {motionEditorModel, motionList}
+		} = this;
 		const {currentTarget} = e;
-		const {left, top, height} = currentTarget.getBoundingClientRect();
+		const {left: x, top: y, height} = currentTarget.getBoundingClientRect();
+		const {left, top} = ReactDOM.findDOMNode(this).getBoundingClientRect();
 
-		onClickMotion(left, top + height);
+		this.setState({ motionEditorModel: motionEditorModel.toggle(x - left, y - top + height, motionList.get(motionIndex)) });
 	}
 
 	onDragStartMotion() {
 		this.tempIndex = -1;
+		this.hideMotionEditor();
 	}
 
 	/**
@@ -636,6 +654,25 @@ class Timeline extends Component {
 
 		if (tempIndex === index) { return; }
 		this.setState({ motionList: motionList.delete(index) });
+	}
+
+	/**
+	 * @param {MotionModel} motionModel
+	 */
+	changeMotionValue(motionModel) {
+		const {state: {motionList, motionEditorModel}} = this;
+		const index = motionModel.get('keyframe');
+
+		this.setState({
+			motionList: motionList.set(index, motionModel),
+			motionEditorModel: motionEditorModel.set('motionModel', motionModel)
+		});
+	}
+
+	hideMotionEditor() {
+		const {state: {motionEditorModel}} = this;
+
+		this.setState({ motionEditorModel: motionEditorModel.set('visible', false) });
 	}
 
 	static get HEIGHT() {
@@ -715,6 +752,14 @@ class Motion extends Component {
 
 	static get SIZE() {
 		return 24;
+	}
+
+	/**
+	 * @param {string} name
+	 * @returns {boolean}
+	 */
+	static hasValues(name) {
+		return _.includes(['up', 'down', 'turnRight', 'turnLeft', 'forward', 'backward', 'left', 'right'], name);
 	}
 
 	static get LIST() {
