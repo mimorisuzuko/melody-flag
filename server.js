@@ -23,31 +23,8 @@ app.use('/docs', express.static(libpath.join(__dirname, 'lib')));
 app.use('/docs', express.static(libpath.join(__dirname, 'docs')));
 
 app.get('/', (req, res) => {
-	const q = qs.stringify({
-		response_type: 'code',
-		client_id,
-		redirect_uri
-	});
-
-	res.redirect(`https://api.rhapsody.com/oauth/authorize?${q}`);
-});
-
-app.get('/authorize', (req, res) => {
-	const {query: {code}} = req;
-	rq.post('https://api.rhapsody.com/oauth/access_token', {
-		form: {
-			client_id,
-			client_secret,
-			response_type: 'code',
-			code,
-			redirect_uri,
-			grant_type: 'authorization_code'
-		}
-	}).then((body) => {
-		const {access_token: accessToken, refresh_token: refreshToken} = JSON.parse(body);
-		const q = qs.stringify({ accessToken, refreshToken, consumerKey: client_id, debugNumber });
-		res.redirect(`${baseUrl}/docs?${q}`);
-	});
+	const q = qs.stringify({debugNumber});
+	res.redirect(`${baseUrl}/docs?${q}`);
 });
 
 app.post('/motion', (req, res) => {

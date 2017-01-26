@@ -29,7 +29,7 @@ module.exports = {
 			root: __dirname,
 			verbose: false,
 			dry: false,
-			exclude: ['index.html', 'index.css']
+			exclude: ['index.html', 'index.css', 'audio.mp3', 'tracks.png']
 		}),
 		new webpack.DefinePlugin({
 			'process.env': {

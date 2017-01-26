@@ -17,8 +17,10 @@ const black = Color('rgb(30, 30, 30)');
 const lblackRGB = black.lighten(0.2).string();
 const llblackRGB = black.lighten(0.6).string();
 const blackRGB = black.string();
+/** @type {HTMLAudioElement} */
+let $audio = null;
 
-class PlayerModel extends Record({ currentTime: 0, totalTime: 0, paused: true, id: '', loading: true }) { }
+class PlayerModel extends Record({ currentTime: 0, totalTime: 0, paused: true }) { }
 
 class DroneModel extends Record({ uuid: '', name: '' }) { }
 
@@ -26,21 +28,35 @@ class App extends Component {
 	constructor(props) {
 		super(props);
 
-		/** @type {{accessToken: string, refreshToken: string, consumerKey: string, debugNumber: number}} */
-		const {accessToken, refreshToken, consumerKey, debugNumber} = qs.parse(location.search.substring(1));
-		Rhapsody.init({ consumerKey });
-		Rhapsody.player.on('ready', this.onReady.bind(this, accessToken, refreshToken));
-		Rhapsody.player.on('playevent', this.onPlay.bind(this));
-		Rhapsody.player.on('playtimer', this.onTimer.bind(this));
+		/** @type {{debugNumber: number}} */
+		const {debugNumber} = qs.parse(location.search.substring(1));
 
 		this.debugNumber = debugNumber;
 		this.state = {
-			trackList: List(),
 			player: new PlayerModel(),
 			droneList: List()
 		};
 
 		this.draw();
+	}
+
+	componentDidMount() {
+		const $t = document.createElement('audio');
+
+		$t.src = 'audio.mp3';
+		document.body.appendChild($t);
+		$audio = $t;
+		this.loop();
+	}
+
+	loop() {
+		const {state: {player}} = this;
+		const {paused, duration: _totalTime, currentTime: _currentTime} = $audio;
+		const currentTime = _currentTime || 0;
+		const totalTime = _totalTime || 0;
+
+		this.setState({ player: player.merge({ paused, totalTime, currentTime }) });
+		requestAnimationFrame(this.loop.bind(this));
 	}
 
 	draw() {
@@ -55,57 +71,8 @@ class App extends Component {
 		});
 	}
 
-	/**
-	 * @param {string} accessToken
-	 * @param {string} refreshToken
-	 */
-	onReady(accessToken, refreshToken) {
-		Rhapsody.member.set({ accessToken, refreshToken });
-		Rhapsody.api.get(false, '/tracks/top', (tracks) => {
-			const {state: {player}} = this;
-			const trackList = Immutable.fromJS(_.map(tracks, (track, i) => {
-				const {
-					id,
-					name,
-					album: {id: albumId},
-					artist: {name: artist},
-					duration
-				} = track;
-
-				if (i === 0) {
-					this.setState({ player: player.merge({ id, totalTime: duration }) });
-				}
-
-				return new TrackModel({ id, name, albumId, artist, duration });
-			}));
-
-			this.setState({ trackList });
-		});
-	}
-
-	/**
-	 * @param {{data: {paused: boolean, id: string}}} e
-	 */
-	onPlay(e) {
-		const {state: {player}} = this;
-		const {data: {paused}} = e;
-
-		this.setState({ player: player.merge({ paused }) });
-	}
-
-	/**
-	 * @param {{data: {currentTime: number, totalTime: number}}} e
-	 */
-	onTimer(e) {
-		const {state: {player}} = this;
-		const {data: {currentTime, totalTime}} = e;
-		const loading = false;
-
-		this.setState({ player: player.merge({ currentTime, totalTime, loading }) });
-	}
-
 	render() {
-		const {state: {trackList, player, droneList}} = this;
+		const {state: {player, droneList}} = this;
 
 		return (
 			<div style={{
@@ -114,25 +81,10 @@ class App extends Component {
 				display: 'flex',
 				flexDirection: 'column'
 			}}>
-				<Body trackList={trackList} onClickTrack={this.onClickTrack.bind(this)} player={player} droneList={droneList} />
+				<Body player={player} droneList={droneList} />
 				<Footer player={player} />
 			</div>
 		);
-	}
-
-	/**
-	 * @param {string} id
-	 * @param {number} totalTime
-	 */
-	onClickTrack(id, totalTime) {
-		const {state: {player}} = this;
-
-		if (player.get('id') === id) { return; }
-		const loading = true;
-		const currentTime = 0;
-
-		Rhapsody.player.pause();
-		this.setState({ player: player.merge({ id, totalTime, currentTime, loading }) });
 	}
 }
 
@@ -145,7 +97,7 @@ class Body extends Component {
 
 	render() {
 		const {
-			props: {trackList, player, droneList, onClickTrack}
+			props: {player, droneList}
 		} = this;
 
 		return (
@@ -154,7 +106,7 @@ class Body extends Component {
 				display: 'flex',
 				flexDirection: 'row'
 			}}>
-				<TrackList list={trackList} player={player} onClickTrack={onClickTrack} />
+				<TrackList player={player} />
 				<TimelineList player={player} droneList={droneList} />
 			</div>
 		);
@@ -179,86 +131,10 @@ class NavTitle extends Component {
 	}
 }
 
-class TrackModel extends Record({ albumId: '', id: '', name: '', artist: '', duration: 0 }) { }
-
-class Track extends Component {
-	constructor(props) {
-		super(props);
-
-		this.state = { thumbnail: '' };
-	}
-
-	componentDidMount() {
-		const {
-			props: {model}
-		} = this;
-
-		Rhapsody.api.get(false, `/albums/${model.get('albumId')}`, (album) => {
-			const thumbnail = album.images[0].url;
-			this.setState({ thumbnail });
-		});
-	}
-
-	render() {
-		const {
-			state: {thumbnail},
-			props: {model, selected}
-		} = this;
-		const width = 48;
-		const contents = _.map([
-			[FaMusic, model.get('name')],
-			[FaUser, model.get('artist')]
-		], ([Icon, text]) => (
-			<div style={{
-				whiteSpace: 'nowrap',
-				textOverflow: 'ellipsis',
-				overflow: 'hidden'
-			}}>
-				<Icon style={{
-					marginRight: 2
-				}} />
-				{text}
-			</div>
-		));
-
-		return (
-			<div onClick={this.onClick.bind(this)} style={{
-				display: 'flex',
-				flexDirection: 'row',
-				cursor: 'pointer',
-				opacity: model.get('id') === selected ? 1 : 0.5
-			}}>
-				<img src={thumbnail} style={{
-					display: 'block',
-					width,
-					height: width
-				}} />
-				<div style={{
-					paddingLeft: 4,
-					boxSizing: 'border-box',
-					width: `calc(100% - ${width}px)`
-				}}>
-					{contents}
-				</div>
-			</div>
-		);
-	}
-
-	onClick() {
-		const {
-			props: {model, onClick}
-		} = this;
-		const id = model.get('id');
-		const duration = model.get('duration');
-
-		onClick(id, duration);
-	}
-}
-
 class TrackList extends Component {
 	render() {
 		const {
-			props: {list, player, onClickTrack}
+			props: {player}
 		} = this;
 		const {WIDTH: width} = TrackList;
 
@@ -275,7 +151,9 @@ class TrackList extends Component {
 					overflowY: 'scroll',
 					height: '100%'
 				}}>
-					{list.map((model) => <Track model={model} selected={player.get('id')} onClick={onClickTrack} />)}
+					<img src='tracks.png' style={{
+						display: 'block'
+					}} />
 				</div>
 			</div>
 		);
@@ -600,7 +478,7 @@ class Timeline extends Component {
 
 		if (player.get('loading')) { return; }
 
-		Rhapsody.player.seek(t);
+		// TODO: seek
 	}
 
 	/**
@@ -876,9 +754,9 @@ class Footer extends Component {
 		const {props: {player}} = this;
 
 		if (player.get('paused')) {
-			Rhapsody.player.play(player.get('id'));
+			$audio.play();
 		} else {
-			Rhapsody.player.pause();
+			$audio.pause();
 		}
 	}
 }
