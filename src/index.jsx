@@ -692,33 +692,80 @@ class Timeline extends Component {
 	}
 }
 
+class TooltipModel extends Record({ visible: false }) { }
+
 class Motion extends Component {
+	constructor(props) {
+		super(props);
+
+		this.state = {
+			tooltip: new TooltipModel()
+		};
+	}
+
 	render() {
-		const {props: {model, style, className}} = this;
+		const {
+			props: {model, style, className},
+			state: {tooltip}
+		} = this;
 		const {LIST: list} = Motion;
 		const name = model.get('name');
 		const {Element} = _.find(list, { name });
 		const {SIZE: size} = Motion;
 
 		return (
-			<div draggable
-				className={className}
-				onClick={this.onClick.bind(this)}
-				onDragStart={this.onDragStart.bind(this)}
-				onDragEnd={this.onDragEnd.bind(this)}
-				style={_.assign({
-					width: size,
-					height: size,
-					borderRadius: '50%',
-					backgroundColor: blueRGB,
-					textAlign: 'center',
-					lineHeight: `${size}px`,
-					cursor: 'pointer',
-					opacity: 0.9999
-				}, style)}>
-				<Element size={16} />
+			<div style={_.assign({
+				position: 'relative',
+				width: size,
+				height: size,
+			}, style)}>
+				<div draggable
+					className={className}
+					onMouseEnter={this.onMouseEnter.bind(this)}
+					onMouseLeave={this.onMouseLeave.bind(this)}
+					onClick={this.onClick.bind(this)}
+					onDragStart={this.onDragStart.bind(this)}
+					onDragEnd={this.onDragEnd.bind(this)}
+					style={{
+						borderRadius: '50%',
+						backgroundColor: blueRGB,
+						textAlign: 'center',
+						lineHeight: `${size}px`,
+						cursor: 'pointer',
+						opacity: 0.9999,
+						width: '100%',
+						height: '100%'
+					}}>
+					<Element size={16} />
+				</div>
+				{tooltip.get('visible') ?
+					<div style={{
+						position: 'absolute',
+						borderRadius: 4,
+						padding: '2px 4px',
+						fontSize: '0.8em',
+						backgroundColor: 'rgba(0, 0, 0, 0.2)',
+						left: size / 2,
+						top: 0,
+						transform: 'translate(-50%, -100%)'
+					}}>
+						{name}
+					</div> : null
+				}
 			</div>
 		);
+	}
+
+	onMouseEnter() {
+		const {state: {tooltip}} = this;
+
+		this.setState({ tooltip: tooltip.set('visible', true) });
+	}
+
+	onMouseLeave() {
+		const {state: {tooltip}} = this;
+
+		this.setState({ tooltip: tooltip.set('visible', false) });
 	}
 
 	/**
@@ -790,15 +837,7 @@ class Footer extends Component {
 		const {props: {player}} = this;
 		const Icon = player.get('paused') ? FaPlayCircle : FaPauseCircle;
 		const {LIST: list} = Motion;
-		const {length} = list;
-		const motionList = _.map(_.chunk(list, length / 2), (a) => (
-			<div style={{
-				display: 'flex',
-				flexDirection: 'row'
-			}}>
-				{_.map(a, ({name}) => <Motion model={new MotionModel({ name })} />)}
-			</div>
-		));
+		const motionList = _.map(list, ({name}) => <Motion model={new MotionModel({ name })} />);
 
 		return (
 			<div style={{
@@ -822,7 +861,12 @@ class Footer extends Component {
 				<div style={{
 					paddingLeft: 10
 				}}>
-					{motionList}
+					<div style={{
+						display: 'flex',
+						flexDirection: 'row'
+					}}>
+						{motionList}
+					</div>
 				</div>
 			</div>
 		);
