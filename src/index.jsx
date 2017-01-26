@@ -476,9 +476,7 @@ class Timeline extends Component {
 		const x = clientX - left;
 		const t = x / interval / fps;
 
-		if (player.get('loading')) { return; }
-
-		// TODO: seek
+		$audio.currentTime = t;
 	}
 
 	/**
