@@ -2,6 +2,16 @@ const noble = require('noble');
 const Drone = require('rolling-spider');
 const _ = require('lodash');
 
+Drone.isDronePeripheral = (peripheral) => {
+	const name = peripheral.advertisement.localName;
+
+	if (!peripheral || name === undefined) {
+		return false;
+	}
+
+	return name.match(/^(RS|Mars|Travis|Maclan|Swat)_/) !== null;
+};
+
 module.exports = class DroneWatcher {
 	constructor() {
 		noble.on('discover', this.onDiscover.bind(this));
