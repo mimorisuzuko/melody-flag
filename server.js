@@ -60,9 +60,28 @@ app.post('/motion', (req, res) => {
 			drone.takeOff();
 		} else if (name === 'land') {
 			drone.land();
+		} else if (name === 'up') {
+			drone.up({ speed, steps });
+		} else if (name === 'down') {
+			drone.down({ speed, steps });
+		} else if (name === 'turnRight') {
+			drone.turnRight({ speed, steps });
+		} else if (name === 'turnLeft') {
+			drone.turnLeft({ speed, steps });
+		} else if (name === 'forward') {
+			drone.forward({ speed, steps });
+		} else if (name === 'backward') {
+			drone.backward({ speed, steps });
+		} else if (name === 'left') {
+			drone.left({ speed, steps });
+		} else if (name === 'right') {
+			drone.right({ speed, steps });
+		} else if (name === 'frontFlip') {
+			drone.frontFlip();
+		} else if (name === 'backFlip') {
+			drone.backFlip();
 		}
 	}
-
 	res.sendStatus(200);
 });
 
