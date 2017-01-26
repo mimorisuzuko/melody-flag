@@ -780,7 +780,7 @@ class Motion extends Component {
 			{ name: 'left', Element: FaArrowLeft },
 			{ name: 'right', Element: FaArrowRight },
 			{ name: 'frontFlip', Element: MdFlipToBack },
-			{ name: 'leftFlip', Element: MdFlipToFront }
+			{ name: 'backFlip', Element: MdFlipToFront }
 		];
 	}
 }
