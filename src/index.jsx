@@ -51,7 +51,7 @@ class App extends Component {
 			const {state: {droneList}} = this;
 
 			this.setState({ droneList: droneList.merge(r) });
-			setTimeout(this.draw.bind(this), 500);
+			setTimeout(this.draw.bind(this), 1000);
 		});
 	}
 
