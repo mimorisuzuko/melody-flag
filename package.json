@@ -1,7 +1,7 @@
 {
   "name": "melody-flag",
   "version": "0.0.1",
-  "description": "ハッカソンのアレ",
+  "description": "LIVE MUSIC HACKASONG Project",
   "main": "server.js",
   "scripts": {
     "pug": "./node_modules/.bin/pug --hierarchy -o docs/ src/",

@@ -1,6 +1,6 @@
 # Melody Flag: People Are Drone Performers!
 
-ハッカソンのアレ
+LIVE MUSIC HACKASONG Project
 
 ![](ss.png)
 
